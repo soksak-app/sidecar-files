@@ -1,0 +1,23 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    devDependencies:
+      '@soksak/plugin-api':
+        specifier: git+file://~/Projects/soksak/core#v0.0.1&path:/packages/plugin-api
+        version: git+file://~/Projects/soksak/core#339a75a955995ade1269ca351fdbeef428d785bb&path:/packages/plugin-api
+
+packages:
+
+  '@soksak/plugin-api@git+file://~/Projects/soksak/core#339a75a955995ade1269ca351fdbeef428d785bb&path:/packages/plugin-api':
+    resolution: {commit: 339a75a955995ade1269ca351fdbeef428d785bb, path: /packages/plugin-api, repo: file://~/Projects/soksak/core, type: git}
+    version: 0.0.1
+
+snapshots:
+
+  '@soksak/plugin-api@git+file://~/Projects/soksak/core#339a75a955995ade1269ca351fdbeef428d785bb&path:/packages/plugin-api': {}

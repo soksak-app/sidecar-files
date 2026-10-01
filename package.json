@@ -1,0 +1,19 @@
+{
+  "name": "@soksak/sidecar-files",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Files sidecar: lists directories inside a project folder over line-delimited JSON.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+file://~/Projects/soksak/sidecars/files"
+  },
+  "type": "module",
+  "files": [
+    "sidecar.json",
+    "build/soksak-files"
+  ],
+  "devDependencies": {
+    "@soksak/plugin-api": "git+file://~/Projects/soksak/core#v0.0.1&path:/packages/plugin-api"
+  }
+}

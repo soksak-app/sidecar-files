@@ -1,0 +1,13 @@
+# Files sidecar
+
+[한국어](README.ko.md)
+
+`@soksak/sidecar-files`: lists and watches directories inside a project folder over line-delimited JSON. The protocol and the host contract are defined in the soksak core specification (`docs/spec/sidecars.md`).
+
+```sh
+make test                 # tests
+make build                # the executable that sidecar.json names
+make release OUT=<folder> SOK=<core>/target/debug/sok   # the release asset for this platform
+```
+
+The checklist is [docs/features.md](docs/features.md).
