@@ -11,6 +11,8 @@
 //	      {"surface": id, "body": {"id": 요청}}
 //	      {"surface": id, "body": {"changed": 상대 경로}}
 //	      {"surface": id, "body": {"id": 요청, "error": 메시지}}
+//	      {"surface": id, "closed": true}
+//	      {"surface": id, "closed": true, "error": 메시지}
 //
 // 세션은 감시하는 디렉터리만 상태로 갖는다. Serve 는 입력이 닫히면 모든 감시를 끝내고 반환한다.
 package files
@@ -62,10 +64,13 @@ type EventBody struct {
 	Error   string  `json:"error,omitempty"`
 }
 
-// Event 는 호스트에 보내는 메시지 하나다.
+// Event 는 호스트에 보내는 메시지 하나다. 요청의 답과 변경은 Body 를, closed 의 답은 Closed 와 닫지 못한 까닭
+// Error 를 담는다(core 의 docs/spec/sidecars.md#messages).
 type Event struct {
-	Surface string    `json:"surface"`
-	Body    EventBody `json:"body"`
+	Surface string     `json:"surface"`
+	Body    *EventBody `json:"body,omitempty"`
+	Closed  bool       `json:"closed,omitempty"`
+	Error   string     `json:"error,omitempty"`
 }
 
 // Serve 는 in 이 닫힐 때까지 요청을 처리하고 답과 변경을 out 에 기록한다.
@@ -98,15 +103,18 @@ func Serve(in io.Reader, out io.Writer) error {
 			return fmt.Errorf("request without surface: %s", scanner.Text())
 		}
 		if request.Closed {
+			// 감시를 끝낸 뒤 모든 closed 에 답한다.
+			answer := Event{Surface: request.Surface, Closed: true}
 			if err := watches.set(request.Surface, "", nil); err != nil {
-				send(Event{Surface: request.Surface, Body: EventBody{Error: err.Error()}})
+				answer.Error = err.Error()
 			}
+			send(answer)
 		} else {
 			body := EventBody{ID: request.Body.ID}
 			if err := handle(watches, request, &body); err != nil {
 				body = EventBody{ID: request.Body.ID, Error: err.Error()}
 			}
-			send(Event{Surface: request.Surface, Body: body})
+			send(Event{Surface: request.Surface, Body: &body})
 		}
 		if err := written(); err != nil {
 			return err
@@ -193,9 +201,9 @@ func (w *watches) watch(current platform.Platform, surface, root, path string) (
 	}
 	changed := path
 	return current.Watch(dir, func() {
-		w.send(Event{Surface: surface, Body: EventBody{Changed: &changed}})
+		w.send(Event{Surface: surface, Body: &EventBody{Changed: &changed}})
 	}, func(failure error) {
-		w.send(Event{Surface: surface, Body: EventBody{Error: failure.Error()}})
+		w.send(Event{Surface: surface, Body: &EventBody{Error: failure.Error()}})
 	})
 }
 
@@ -205,7 +213,7 @@ func (w *watches) closeAll() {
 	for surface, stops := range w.sessions {
 		for _, stop := range stops {
 			if err := stop(); err != nil {
-				w.send(Event{Surface: surface, Body: EventBody{Error: err.Error()}})
+				w.send(Event{Surface: surface, Body: &EventBody{Error: err.Error()}})
 			}
 		}
 	}

@@ -3,6 +3,7 @@ package files_test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -91,5 +92,22 @@ func TestListRejectsPathsOutsideTheRootAndReportsFailuresWithTheRequestID(t *tes
 	events := serve(t, request(t, "", "r", ""))
 	if len(events) != 1 || !strings.Contains(events[0].Body.Error, "requires a root") {
 		t.Fatalf("missing root: %+v", events)
+	}
+}
+
+func TestClosedIsAnsweredAfterItsWatchesEnd(t *testing.T) {
+	root := t.TempDir()
+	var out bytes.Buffer
+	input := request(t, root, "r1", ".") + "\n" + `{"surface":"state:files:p1","root":"` + root + `","closed":true}` + "\n"
+	if err := files.Serve(strings.NewReader(input), &out); err != nil {
+		t.Fatalf("serve: %v", err)
+	}
+	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
+	var answer map[string]any
+	if err := json.Unmarshal([]byte(lines[len(lines)-1]), &answer); err != nil {
+		t.Fatalf("invalid answer %q: %v", lines[len(lines)-1], err)
+	}
+	if want := map[string]any{"surface": "state:files:p1", "closed": true}; fmt.Sprint(answer) != fmt.Sprint(want) {
+		t.Fatalf("the last message is %v, want the close answer %v", answer, want)
 	}
 }
