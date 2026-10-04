@@ -1,0 +1,23 @@
+name: ci
+# build-machine: skip build reason=the release workflow builds the sidecar; make test builds what the tests run
+# build-machine: skip smoke reason=the sidecar has no application to start; its protocol tests run the binary
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - uses: pnpm/action-setup@v4
+      - name: Test
+        run: make test
