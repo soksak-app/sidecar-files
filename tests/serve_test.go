@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/min-median-max/soksak-sidecar-files/src/files"
+	"github.com/soksak-app/sidecar-files/src/files"
 )
 
 // serve 는 요청 줄들을 처리하고 받은 이벤트를 반환한다.

@@ -1,3 +1,3 @@
-module github.com/min-median-max/soksak-sidecar-files
+module github.com/soksak-app/sidecar-files
 
 go 1.25.0

@@ -29,10 +29,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/min-median-max/soksak-sidecar-files/src/platform"
-	_ "github.com/min-median-max/soksak-sidecar-files/src/platform/darwin"
-	_ "github.com/min-median-max/soksak-sidecar-files/src/platform/linux"
-	_ "github.com/min-median-max/soksak-sidecar-files/src/platform/windows"
+	"github.com/soksak-app/sidecar-files/src/platform"
+	_ "github.com/soksak-app/sidecar-files/src/platform/darwin"
+	_ "github.com/soksak-app/sidecar-files/src/platform/linux"
+	_ "github.com/soksak-app/sidecar-files/src/platform/windows"
 )
 
 // Request 는 호스트가 보낸 메시지 하나다.

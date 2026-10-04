@@ -6,7 +6,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/min-median-max/soksak-sidecar-files/src/files"
+	"github.com/soksak-app/sidecar-files/src/files"
 )
 
 func main() {

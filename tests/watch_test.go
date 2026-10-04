@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/min-median-max/soksak-sidecar-files/src/files"
+	"github.com/soksak-app/sidecar-files/src/files"
 )
 
 // session 은 Serve 를 실행하고 요청 전송과 이벤트 수신을 제공한다.

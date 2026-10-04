@@ -5,7 +5,7 @@ package windows
 import (
 	"errors"
 
-	"github.com/min-median-max/soksak-sidecar-files/src/platform"
+	"github.com/soksak-app/sidecar-files/src/platform"
 )
 
 type implementation struct{}
