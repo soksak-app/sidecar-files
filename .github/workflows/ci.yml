@@ -21,3 +21,18 @@ jobs:
       - uses: pnpm/action-setup@v4
       - name: Test
         run: make test
+
+  # 디렉터리 감시는 Linux 에서 inotify 를 쓴다(docs/features.md S8). 같은 test 를 Linux runner 에서도 실행한다.
+  test-linux:
+    runs-on: ubuntu-26.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - uses: pnpm/action-setup@v4
+      - name: Test
+        run: make test
