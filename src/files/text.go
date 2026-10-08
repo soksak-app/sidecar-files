@@ -3,6 +3,7 @@ package files
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -16,11 +17,14 @@ import (
 // textLimit 은 read 하는 파일과 write 하는 text 의 최대 바이트 수다.
 const textLimit = 8388608
 
+// bytesLimit is the largest file that readBytes reads and writeBytes writes; its base64 stays within a request line.
+const bytesLimit = 33554432
+
 // byteOrderMark 는 UTF-8 의 BOM 이다.
 var byteOrderMark = []byte{0xef, 0xbb, 0xbf}
 
-func tooLarge(size int64, path string) error {
-	return fmt.Errorf("file is %d bytes, above the %d-byte limit: %s", size, textLimit, path)
+func tooLarge(size, limit int64, path string) error {
+	return fmt.Errorf("file is %d bytes, above the %d-byte limit: %s", size, limit, path)
 }
 
 func version(content []byte) string {
@@ -28,24 +32,41 @@ func version(content []byte) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// Read 는 root 안의 정규 파일 path 의 내용을 text, 판, 줄바꿈, BOM 으로 body 에 담는다.
-func Read(root, path string, body *EventBody) error {
+// readFile returns the content of the regular file path inside root when it has at most limit bytes.
+func readFile(root, path string, limit int64) ([]byte, error) {
 	target, err := resolve(root, path)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// 크기와 종류는 열기 전에 확인한다. FIFO 는 읽으려고 열면 멈춘다.
 	info, err := os.Stat(target)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if !info.Mode().IsRegular() {
-		return fmt.Errorf("not a regular file: %s", path)
+		return nil, fmt.Errorf("not a regular file: %s", path)
 	}
-	if info.Size() > textLimit {
-		return tooLarge(info.Size(), path)
+	if info.Size() > limit {
+		return nil, tooLarge(info.Size(), limit, path)
 	}
-	content, err := os.ReadFile(target)
+	return os.ReadFile(target)
+}
+
+// ReadBytes puts the content of the regular file path inside root into body as base64 with its version.
+func ReadBytes(root, path string, body *EventBody) error {
+	content, err := readFile(root, path, bytesLimit)
+	if err != nil {
+		return err
+	}
+	data := base64.StdEncoding.EncodeToString(content)
+	body.Data = &data
+	body.Version = version(content)
+	return nil
+}
+
+// Read 는 root 안의 정규 파일 path 의 내용을 text, 판, 줄바꿈, BOM 으로 body 에 담는다.
+func Read(root, path string, body *EventBody) error {
+	content, err := readFile(root, path, textLimit)
 	if err != nil {
 		return err
 	}
@@ -92,6 +113,48 @@ func newline(text []byte) string {
 	return name
 }
 
+// requestExpect reads the expect field of a write request of operation: a version or null. A request without the
+// field is refused instead of being taken as null.
+func requestExpect(request Request, operation string) (*string, error) {
+	if len(request.Body.Expect) == 0 {
+		return nil, fmt.Errorf("%s requires expect: a version or null", operation)
+	}
+	var expect *string
+	if err := json.Unmarshal(request.Body.Expect, &expect); err != nil {
+		return nil, fmt.Errorf("%s expect %s is not a version or null", operation, request.Body.Expect)
+	}
+	if expect != nil {
+		if decoded, err := hex.DecodeString(*expect); err != nil || len(decoded) != sha256.Size || hex.EncodeToString(decoded) != *expect {
+			return nil, fmt.Errorf("%s expect %q is not a SHA-256 version", operation, *expect)
+		}
+	}
+	return expect, nil
+}
+
+// writeBytesRequest checks the fields of a writeBytes request and writes the decoded bytes.
+func writeBytesRequest(request Request, body *EventBody) error {
+	if request.Body.Data == nil {
+		return errors.New("writeBytes requires data")
+	}
+	expect, err := requestExpect(request, "writeBytes")
+	if err != nil {
+		return err
+	}
+	content, err := base64.StdEncoding.Strict().DecodeString(*request.Body.Data)
+	if err != nil {
+		return errors.New("writeBytes data is not base64")
+	}
+	if len(content) > bytesLimit {
+		return tooLarge(int64(len(content)), bytesLimit, request.Body.Path)
+	}
+	written, err := writeFile(request.Root, request.Body.Path, content, expect)
+	if err != nil {
+		return err
+	}
+	body.Version = written
+	return nil
+}
+
 // writeRequest 는 write 요청의 필드를 확인하고 Write 를 실행한다. expect 가 빠진 요청은 null 로 보지 않고 거절한다.
 func writeRequest(request Request, body *EventBody) error {
 	if request.Body.Text == nil {
@@ -100,17 +163,9 @@ func writeRequest(request Request, body *EventBody) error {
 	if request.Body.BOM == nil {
 		return errors.New("write requires bom")
 	}
-	if len(request.Body.Expect) == 0 {
-		return errors.New("write requires expect: a version or null")
-	}
-	var expect *string
-	if err := json.Unmarshal(request.Body.Expect, &expect); err != nil {
-		return fmt.Errorf("write expect %s is not a version or null", request.Body.Expect)
-	}
-	if expect != nil {
-		if decoded, err := hex.DecodeString(*expect); err != nil || len(decoded) != sha256.Size || hex.EncodeToString(decoded) != *expect {
-			return fmt.Errorf("write expect %q is not a SHA-256 version", *expect)
-		}
+	expect, err := requestExpect(request, "write")
+	if err != nil {
+		return err
 	}
 	written, err := Write(request.Root, request.Body.Path, *request.Body.Text, expect, *request.Body.BOM)
 	if err != nil {
@@ -126,12 +181,18 @@ func writeRequest(request Request, body *EventBody) error {
 // expect 가 nil 이면 새 파일을 0666(umask 적용)으로 만들고, 경로가 있으면 실패한다.
 func Write(root, path, text string, expect *string, bom bool) (string, error) {
 	if len(text) > textLimit {
-		return "", tooLarge(int64(len(text)), path)
+		return "", tooLarge(int64(len(text)), textLimit, path)
 	}
 	content := []byte(text)
 	if bom {
 		content = append(append([]byte{}, byteOrderMark...), content...)
 	}
+	return writeFile(root, path, content, expect)
+}
+
+// writeFile writes content to path inside root with the in-place, expect and creation rules of Write and returns
+// the version of content.
+func writeFile(root, path string, content []byte, expect *string) (string, error) {
 	file, err := openForWrite(root, path, expect)
 	if err != nil {
 		return "", err

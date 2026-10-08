@@ -7,6 +7,8 @@
 //	      {"surface": id, "root": 경로, "body": {"operation": "git", "id": 요청}}
 //	      {"surface": id, "root": 경로, "body": {"operation": "read", "id": 요청, "path": 상대 경로}}
 //	      {"surface": id, "root": 경로, "body": {"operation": "write", "id": 요청, "path": 상대 경로, "text": 내용, "expect": 판|null, "bom": 참거짓}}
+//	      {"surface": id, "root": 경로, "body": {"operation": "readBytes", "id": 요청, "path": 상대 경로}}
+//	      {"surface": id, "root": 경로, "body": {"operation": "writeBytes", "id": 요청, "path": 상대 경로, "data": base64, "expect": 판|null}}
 //	      {"surface": id, "closed": true}
 //	출력  {"surface": id, "body": {"id": 요청, "entries": [{"name": 이름, "directory": 참거짓}]}}
 //	      {"surface": id, "body": {"id": 요청, "entries": [{"path": 상대 경로, "status": 상태}]}}
@@ -54,6 +56,8 @@ type Request struct {
 		Text   *string         `json:"text"`
 		Expect json.RawMessage `json:"expect"`
 		BOM    *bool           `json:"bom"`
+		// Data holds the base64 bytes of writeBytes.
+		Data *string `json:"data"`
 	} `json:"body"`
 }
 
@@ -69,7 +73,9 @@ type EventBody struct {
 	// Entries 는 목록([]Entry)과 git 상태([]GitEntry)의 답에만 있다. 항목이 없으면 빈 배열이다.
 	Entries any `json:"entries,omitempty"`
 	// Text, Newline, BOM 은 read 의 답에만, Version 은 read 와 write 의 답에만 있다.
-	Text    *string `json:"text,omitempty"`
+	Text *string `json:"text,omitempty"`
+	// Data holds the base64 bytes of the readBytes reply.
+	Data    *string `json:"data,omitempty"`
 	Version string  `json:"version,omitempty"`
 	Newline string  `json:"newline,omitempty"`
 	BOM     *bool   `json:"bom,omitempty"`
@@ -163,6 +169,10 @@ func handle(watches *watches, request Request, body *EventBody) error {
 		return Read(request.Root, request.Body.Path, body)
 	case "write":
 		return writeRequest(request, body)
+	case "readBytes":
+		return ReadBytes(request.Root, request.Body.Path, body)
+	case "writeBytes":
+		return writeBytesRequest(request, body)
 	case "watch":
 		return watches.set(request.Surface, request.Root, request.Body.Paths)
 	default:
