@@ -17,11 +17,26 @@ func init() { platform.Register(implementation{}) }
 // oEvtOnly 는 감시만을 위해 여는 플래그(O_EVTONLY)다. 연 디렉터리가 있는 볼륨의 꺼내기를 막지 않는다.
 const oEvtOnly = 0x8000
 
-// Watch 는 디렉터리의 기술자에 EVFILT_VNODE 를 걸고, 멈춤 신호를 받을 파이프를 같은 kqueue 에 건다.
-func (implementation) Watch(dir string, changed func(), failed func(error)) (func() error, error) {
-	fd, err := syscall.Open(dir, oEvtOnly|syscall.O_DIRECTORY, 0)
+// Watch 는 디렉터리나 정규 파일의 기술자에 EVFILT_VNODE 를 걸고, 멈춤 신호를 받을 파이프를 같은 kqueue 에 건다.
+// 디렉터리는 항목의 변화(NOTE_WRITE, NOTE_EXTEND)와 자신의 삭제와 이름 변경을, 정규 파일은 내용의 쓰기와 늘어남
+// (NOTE_WRITE, NOTE_EXTEND)을 받는다.
+func (implementation) Watch(path string, changed func(), failed func(error)) (func() error, error) {
+	fd, err := syscall.Open(path, oEvtOnly, 0)
 	if err != nil {
-		return nil, fmt.Errorf("open %s: %w", dir, err)
+		return nil, fmt.Errorf("open %s: %w", path, err)
+	}
+	var stat syscall.Stat_t
+	if err := syscall.Fstat(fd, &stat); err != nil {
+		return nil, errors.Join(fmt.Errorf("stat %s: %w", path, err), syscall.Close(fd))
+	}
+	var fflags uint32
+	switch stat.Mode & syscall.S_IFMT {
+	case syscall.S_IFDIR:
+		fflags = syscall.NOTE_WRITE | syscall.NOTE_DELETE | syscall.NOTE_RENAME | syscall.NOTE_EXTEND
+	case syscall.S_IFREG:
+		fflags = syscall.NOTE_WRITE | syscall.NOTE_EXTEND
+	default:
+		return nil, errors.Join(fmt.Errorf("watch %s: not a regular file or directory", path), syscall.Close(fd))
 	}
 	kq, err := syscall.Kqueue()
 	if err != nil {
@@ -35,17 +50,17 @@ func (implementation) Watch(dir string, changed func(), failed func(error)) (fun
 		var first error
 		for _, each := range []int{fd, kq, pipe[0]} {
 			if err := syscall.Close(each); err != nil && first == nil {
-				first = fmt.Errorf("close watch of %s: %w", dir, err)
+				first = fmt.Errorf("close watch of %s: %w", path, err)
 			}
 		}
 		return first
 	}
 	var events [2]syscall.Kevent_t
 	syscall.SetKevent(&events[0], fd, syscall.EVFILT_VNODE, syscall.EV_ADD|syscall.EV_CLEAR)
-	events[0].Fflags = syscall.NOTE_WRITE | syscall.NOTE_DELETE | syscall.NOTE_RENAME | syscall.NOTE_EXTEND
+	events[0].Fflags = fflags
 	syscall.SetKevent(&events[1], pipe[0], syscall.EVFILT_READ, syscall.EV_ADD)
 	if _, err := syscall.Kevent(kq, events[:], nil, nil); err != nil {
-		return nil, errors.Join(fmt.Errorf("kevent %s: %w", dir, err), closeAll(), syscall.Close(pipe[1]))
+		return nil, errors.Join(fmt.Errorf("kevent %s: %w", path, err), closeAll(), syscall.Close(pipe[1]))
 	}
 	go func() {
 		defer func() {
@@ -60,7 +75,7 @@ func (implementation) Watch(dir string, changed func(), failed func(error)) (fun
 				continue
 			}
 			if err != nil {
-				failed(fmt.Errorf("kevent %s: %w", dir, err))
+				failed(fmt.Errorf("kevent %s: %w", path, err))
 				return
 			}
 			for _, event := range received[:n] {

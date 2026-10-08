@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -105,5 +106,34 @@ func TestWatchRejectsPathsOutsideTheRoot(t *testing.T) {
 	s.send(root, map[string]any{"operation": "watch", "id": "w", "paths": []string{".."}})
 	if reply := s.next("watch reply"); reply.Body.ID != "w" || !strings.Contains(reply.Body.Error, "leaves the root") {
 		t.Fatalf("reply = %+v", reply)
+	}
+}
+
+func TestWatchReportsAChangedFileContent(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skipf("watching file content is implemented only on darwin, not on %s", runtime.GOOS)
+	}
+	root := t.TempDir()
+	path := filepath.Join(root, "notes.txt")
+	if err := os.WriteFile(path, []byte("one\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s := startSession(t)
+	s.send(root, map[string]any{"operation": "watch", "id": "w", "paths": []string{"notes.txt"}})
+	if reply := s.next("watch reply"); reply.Body.ID != "w" || reply.Body.Error != "" {
+		t.Fatalf("watch reply = %+v", *reply.Body)
+	}
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := file.WriteString("two\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if event := s.next("change of notes.txt"); event.Body.Changed == nil || *event.Body.Changed != "notes.txt" || event.Body.Error != "" {
+		t.Fatalf("event = %+v, want changed notes.txt", *event.Body)
 	}
 }

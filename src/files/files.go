@@ -5,16 +5,20 @@
 //	입력  {"surface": id, "root": 경로, "body": {"operation": "list", "id": 요청, "path": 상대 경로}}
 //	      {"surface": id, "root": 경로, "body": {"operation": "watch", "id": 요청, "paths": [상대 경로]}}
 //	      {"surface": id, "root": 경로, "body": {"operation": "git", "id": 요청}}
+//	      {"surface": id, "root": 경로, "body": {"operation": "read", "id": 요청, "path": 상대 경로}}
+//	      {"surface": id, "root": 경로, "body": {"operation": "write", "id": 요청, "path": 상대 경로, "text": 내용, "expect": 판|null, "bom": 참거짓}}
 //	      {"surface": id, "closed": true}
 //	출력  {"surface": id, "body": {"id": 요청, "entries": [{"name": 이름, "directory": 참거짓}]}}
 //	      {"surface": id, "body": {"id": 요청, "entries": [{"path": 상대 경로, "status": 상태}]}}
+//	      {"surface": id, "body": {"id": 요청, "text": 내용, "version": 판, "newline": 줄바꿈, "bom": 참거짓}}
+//	      {"surface": id, "body": {"id": 요청, "version": 판}}
 //	      {"surface": id, "body": {"id": 요청}}
 //	      {"surface": id, "body": {"changed": 상대 경로}}
 //	      {"surface": id, "body": {"id": 요청, "error": 메시지}}
 //	      {"surface": id, "closed": true}
 //	      {"surface": id, "closed": true, "error": 메시지}
 //
-// 세션은 감시하는 디렉터리만 상태로 갖는다. Serve 는 입력이 닫히면 모든 감시를 끝내고 반환한다.
+// 세션은 감시하는 경로만 상태로 갖는다. Serve 는 입력이 닫히면 모든 감시를 끝내고 반환한다.
 package files
 
 import (
@@ -23,6 +27,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -45,6 +50,10 @@ type Request struct {
 		ID        string   `json:"id"`
 		Path      string   `json:"path"`
 		Paths     []string `json:"paths"`
+		// Text, Expect, BOM 은 write 에만 있다. Expect 는 빠진 필드와 null 을 구별하려고 원문 그대로 받는다.
+		Text   *string         `json:"text"`
+		Expect json.RawMessage `json:"expect"`
+		BOM    *bool           `json:"bom"`
 	} `json:"body"`
 }
 
@@ -54,12 +63,17 @@ type Entry struct {
 	Directory bool   `json:"directory"`
 }
 
-// EventBody 는 요청의 답(목록, 감시 확인, 실패)이나 감시한 디렉터리의 변경 하나를 담는다.
+// EventBody 는 요청의 답(목록, 내용, 쓰기, 감시 확인, 실패)이나 감시한 경로의 변경 하나를 담는다.
 type EventBody struct {
 	ID string `json:"id,omitempty"`
 	// Entries 는 목록([]Entry)과 git 상태([]GitEntry)의 답에만 있다. 항목이 없으면 빈 배열이다.
 	Entries any `json:"entries,omitempty"`
-	// Changed 는 항목이 바뀐 감시 디렉터리의 상대 경로다. 프로젝트 폴더는 빈 문자열이다.
+	// Text, Newline, BOM 은 read 의 답에만, Version 은 read 와 write 의 답에만 있다.
+	Text    *string `json:"text,omitempty"`
+	Version string  `json:"version,omitempty"`
+	Newline string  `json:"newline,omitempty"`
+	BOM     *bool   `json:"bom,omitempty"`
+	// Changed 는 항목이 바뀐 감시 디렉터리나 내용이 바뀐 감시 파일의 상대 경로다. 프로젝트 폴더는 빈 문자열이다.
 	Changed *string `json:"changed,omitempty"`
 	Error   string  `json:"error,omitempty"`
 }
@@ -77,6 +91,8 @@ type Event struct {
 func Serve(in io.Reader, out io.Writer) error {
 	var mu sync.Mutex
 	encoder := json.NewEncoder(out)
+	// 8 MiB 의 text 가 JSON 에서 커지는 것은 HTML 문자 escape 를 빼야 최대 6 배로 줄의 한도 안에 든다.
+	encoder.SetEscapeHTML(false)
 	var writeErr error
 	send := func(event Event) {
 		mu.Lock()
@@ -93,7 +109,8 @@ func Serve(in io.Reader, out io.Writer) error {
 	watches := newWatches(send)
 	defer watches.closeAll()
 	scanner := bufio.NewScanner(in)
-	scanner.Buffer(make([]byte, 0, 64*1024), 16*1024*1024)
+	// 요청 줄은 sidecar 출력 줄의 한도인 67108864 바이트까지다. 버퍼는 그 줄과 줄바꿈을 함께 담는다.
+	scanner.Buffer(make([]byte, 0, 64*1024), lineLimit+1)
 	for scanner.Scan() {
 		var request Request
 		if err := json.Unmarshal(scanner.Bytes(), &request); err != nil {
@@ -142,6 +159,10 @@ func handle(watches *watches, request Request, body *EventBody) error {
 		}
 		body.Entries = entries
 		return nil
+	case "read":
+		return Read(request.Root, request.Body.Path, body)
+	case "write":
+		return writeRequest(request, body)
 	case "watch":
 		return watches.set(request.Surface, request.Root, request.Body.Paths)
 	default:
@@ -149,7 +170,10 @@ func handle(watches *watches, request Request, body *EventBody) error {
 	}
 }
 
-// watches 는 세션마다 감시 중인 디렉터리의 멈춤 함수다.
+// lineLimit 은 요청 줄의 최대 바이트 수다.
+const lineLimit = 67108864
+
+// watches 는 세션마다 감시 중인 경로의 멈춤 함수다.
 type watches struct {
 	mu       sync.Mutex
 	send     func(Event)
@@ -195,12 +219,20 @@ func (w *watches) set(surface, root string, paths []string) error {
 }
 
 func (w *watches) watch(current platform.Platform, surface, root, path string) (func() error, error) {
-	dir, err := resolve(root, path)
+	target, err := resolve(root, path)
 	if err != nil {
 		return nil, err
 	}
+	// FIFO 같은 다른 종류는 감시하려고 열면 멈출 수 있으므로 열기 전에 거른다.
+	info, err := os.Stat(target)
+	if err != nil {
+		return nil, err
+	}
+	if !info.IsDir() && !info.Mode().IsRegular() {
+		return nil, fmt.Errorf("not a regular file or directory: %s", path)
+	}
 	changed := path
-	return current.Watch(dir, func() {
+	return current.Watch(target, func() {
 		w.send(Event{Surface: surface, Body: &EventBody{Changed: &changed}})
 	}, func(failure error) {
 		w.send(Event{Surface: surface, Body: &EventBody{Error: failure.Error()}})
@@ -222,6 +254,12 @@ func (w *watches) closeAll() {
 
 // resolve 는 root 안의 상대 경로 path 를 심볼릭 링크를 따라간 절대 경로로 반환한다. root 를 벗어나면 실패한다.
 func resolve(root, path string) (string, error) {
+	return resolveIn(root, path, false)
+}
+
+// resolveIn 은 resolve 와 같다. missing 이면 path 가 없을 때 그 부모 디렉터리를 따라간 경로에 마지막 이름을 붙인다.
+// 새 파일을 만들 경로다. 대상이 없는 심볼릭 링크도 이 경로가 되며, 만들기의 O_EXCL 이 그 링크를 있는 것으로 거절한다.
+func resolveIn(root, path string, missing bool) (string, error) {
 	if filepath.IsAbs(path) {
 		return "", fmt.Errorf("path %q must be relative to the root", path)
 	}
@@ -229,15 +267,30 @@ func resolve(root, path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	target, err := filepath.EvalSymlinks(filepath.Join(base, path))
+	joined := filepath.Join(base, path)
+	// 이름만으로 root 를 벗어나는 경로는 그 바깥 경로를 조회하기 전에 거절한다.
+	if !within(base, joined) {
+		return "", fmt.Errorf("path %q leaves the root", path)
+	}
+	target, err := filepath.EvalSymlinks(joined)
+	if err != nil && missing && errors.Is(err, fs.ErrNotExist) {
+		var parent string
+		parent, err = filepath.EvalSymlinks(filepath.Dir(joined))
+		target = filepath.Join(parent, filepath.Base(joined))
+	}
 	if err != nil {
 		return "", err
 	}
-	inside, err := filepath.Rel(base, target)
-	if err != nil || inside == ".." || strings.HasPrefix(inside, ".."+string(filepath.Separator)) {
+	if !within(base, target) {
 		return "", fmt.Errorf("path %q leaves the root", path)
 	}
 	return target, nil
+}
+
+// within 은 절대 경로 target 이 base 이거나 그 안에 있는지 반환한다.
+func within(base, target string) bool {
+	inside, err := filepath.Rel(base, target)
+	return err == nil && inside != ".." && !strings.HasPrefix(inside, ".."+string(filepath.Separator))
 }
 
 // List 는 root 안의 상대 경로 path 에 있는 디렉터리의 항목을 디렉터리 먼저, 각 묶음은 이름순으로 반환한다.

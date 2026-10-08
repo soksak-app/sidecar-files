@@ -11,9 +11,10 @@ import (
 
 // Platform 은 운영체제마다 다른 동작이다.
 type Platform interface {
-	// Watch 는 디렉터리 dir 의 항목이 생기거나 지워지거나 이름이 바뀔 때마다 changed 를 호출한다.
+	// Watch 는 디렉터리 path 의 항목이 생기거나 지워지거나 이름이 바뀔 때마다, 정규 파일 path 의 내용이 쓰이거나
+	// 늘어날 때마다 changed 를 호출한다. 호출하는 쪽이 path 가 디렉터리나 정규 파일인지 먼저 확인한다.
 	// 감시가 도중에 실패하면 failed 를 한 번 호출하고 멈춘다. 반환한 stop 은 감시를 끝낸다.
-	Watch(dir string, changed func(), failed func(error)) (stop func() error, err error)
+	Watch(path string, changed func(), failed func(error)) (stop func() error, err error)
 }
 
 var (

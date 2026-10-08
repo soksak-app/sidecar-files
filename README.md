@@ -2,7 +2,7 @@
 
 [한국어](README.ko.md)
 
-`@soksak/sidecar-files`: lists and watches directories inside a project folder over line-delimited JSON. The protocol and the host contract are defined in the soksak core specification (`docs/spec/sidecars.md`).
+`@soksak/sidecar-files`: lists and watches directories, and reads, writes and watches text files, inside a project folder over line-delimited JSON. The protocol and the host contract are defined in the soksak core specification (`docs/spec/sidecars.md`).
 
 ```sh
 make test                 # tests
