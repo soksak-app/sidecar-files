@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/soksak-app/sidecar-files/src/platform"
+	"github.com/soksak-app/sidecar-files/src/routine"
 )
 
 type implementation struct{}
@@ -62,7 +63,7 @@ func (implementation) Watch(path string, changed func(), failed func(error)) (fu
 	if _, err := syscall.Kevent(kq, events[:], nil, nil); err != nil {
 		return nil, errors.Join(fmt.Errorf("kevent %s: %w", path, err), closeAll(), syscall.Close(pipe[1]))
 	}
-	go func() {
+	routine.Go("watch", func() {
 		defer func() {
 			if err := closeAll(); err != nil {
 				failed(err)
@@ -85,7 +86,7 @@ func (implementation) Watch(path string, changed func(), failed func(error)) (fu
 			}
 			changed()
 		}
-	}()
+	})
 	// 쓰는 끝을 닫으면 읽는 끝에 EOF 가 생기고, 감시 고루틴이 그 이벤트를 받아 끝난다.
 	return func() error { return syscall.Close(pipe[1]) }, nil
 }

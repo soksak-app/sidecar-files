@@ -103,6 +103,9 @@ type message struct {
 	stop  bool
 }
 
+// ExitDeadline is the time a process waits for the event file to be flushed before it ends.
+const ExitDeadline = 2 * time.Second
+
 // reservedForRequests is the number of slots of the queue that only requests use.
 const reservedForRequests = 2
 
