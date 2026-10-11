@@ -10,6 +10,9 @@ test("sidecar.json satisfies the sidecar format and the package publishes its ex
   const pkg = read("package.json");
   assert.ok(pkg.files.includes("sidecar.json"));
   assert.ok(pkg.files.includes(sidecar.executable));
+  // The release packs the event catalog that the manifest names.
+  assert.equal(sidecar.events, "events.json");
+  assert.ok(pkg.files.includes(sidecar.events));
   // build 는 Makefile 의 build 목표가 sidecar.json 이 가리키는 실행 파일로 쓴다.
   const makefile = readFileSync(new URL("../Makefile", import.meta.url), "utf8");
   assert.match(makefile, new RegExp(`-o ${sidecar.executable} `));

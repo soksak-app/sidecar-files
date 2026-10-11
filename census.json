@@ -1,0 +1,6 @@
+{
+  "entrances": {
+    "go.go-statement": ["^src/routine/routine\\.go$", "^src/events/log\\.go$"],
+    "go.recover": ["^src/routine/routine\\.go$", "^src/events/log\\.go$"]
+  }
+}

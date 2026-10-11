@@ -1,0 +1,99 @@
+{
+  "schema": 2,
+  "layers": ["sidecar"],
+  "events": {
+    "log.open": {
+      "layer": "sidecar",
+      "class": "lifecycle",
+      "level": "info",
+      "fields": { "schema": "number", "pid": "number", "role": "string", "boot": "string" },
+      "description": "The first line of every event file; role is files."
+    },
+    "log.dropped": {
+      "layer": "sidecar",
+      "class": "lifecycle",
+      "level": "warn",
+      "fields": { "from_seq": "number", "to_seq": "number", "count": "number", "bytes": "number", "reason": "string" },
+      "description": "A range of seq that the writer refused or that the disk refused; it explains the gap."
+    },
+    "log.rotated": {
+      "layer": "sidecar",
+      "class": "lifecycle",
+      "level": "info",
+      "fields": { "bytes": "number", "kept": "number", "removed": "string|null" },
+      "description": "A file was closed and a new file started."
+    },
+    "sidecar.files.start": {
+      "layer": "sidecar",
+      "class": "lifecycle",
+      "level": "info",
+      "fields": { "pid": "number", "goos": "string", "goarch": "string" },
+      "description": "The sidecar started and reads requests."
+    },
+    "sidecar.files.exit": {
+      "layer": "sidecar",
+      "class": "lifecycle",
+      "level": "info",
+      "fields": { "status": "number" },
+      "description": "The sidecar ends with this exit status: 0 when its input closed, 1 for a failure."
+    },
+    "sidecar.files.failure": {
+      "layer": "sidecar",
+      "class": "lifecycle",
+      "level": "error",
+      "fields": { "error": "string" },
+      "description": "A failure ended the sidecar: a request line that is not valid, a reply that cannot be written, or a read error."
+    },
+    "sidecar.files.panic": {
+      "layer": "sidecar",
+      "class": "lifecycle",
+      "level": "error",
+      "fields": { "routine": "string", "panic": "string", "stack": "string" },
+      "description": "A goroutine panicked; the process ends with status 2."
+    },
+    "sidecar.files.request": {
+      "layer": "sidecar",
+      "class": "call",
+      "level": ["info", "warn"],
+      "result": true,
+      "fields": { "surface": "string", "operation": "string", "id?": "string", "path?": "string", "paths?": "array", "ok": "boolean", "micros": "number", "error?": "string" },
+      "description": "A request was answered; the cids are those of the request line, and error names a failed request as <code>: <text>. The text of a write is not stored."
+    },
+    "sidecar.files.watch_start": {
+      "layer": "sidecar",
+      "class": "lifecycle",
+      "level": "info",
+      "fields": { "surface": "string", "path": "string" },
+      "description": "A watch of a directory or a file started; path is relative to the project folder."
+    },
+    "sidecar.files.watch_change": {
+      "layer": "sidecar",
+      "class": "io",
+      "level": "debug",
+      "fields": { "surface": "string", "path": "string" },
+      "description": "A watched directory or file changed and the sidecar reported it."
+    },
+    "sidecar.files.watch_end": {
+      "layer": "sidecar",
+      "class": "lifecycle",
+      "level": "info",
+      "fields": { "surface": "string", "path": "string", "reason": "string" },
+      "description": "A watch ended; reason is replaced, closed, input closed or start failed."
+    },
+    "sidecar.files.watch_failed": {
+      "layer": "sidecar",
+      "class": "lifecycle",
+      "level": "error",
+      "fields": { "surface": "string", "path": "string", "error": "string" },
+      "description": "A watch failed on its own or did not stop; the sidecar reported the error to the surface."
+    },
+    "sidecar.files.git": {
+      "layer": "sidecar",
+      "class": "call",
+      "level": ["info", "warn"],
+      "result": true,
+      "fields": { "surface": "string", "args": "string", "ok": "boolean", "micros": "number", "error?": "string" },
+      "description": "One call of git; error is the exit status of git as the code. A folder outside a repository answers 128, which the request reports as an empty status."
+    }
+  }
+}
