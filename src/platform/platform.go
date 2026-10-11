@@ -15,6 +15,9 @@ type Platform interface {
 	// 늘어날 때마다 changed 를 호출한다. 호출하는 쪽이 path 가 디렉터리나 정규 파일인지 먼저 확인한다.
 	// 감시가 도중에 실패하면 failed 를 한 번 호출하고 멈춘다. 반환한 stop 은 감시를 끝낸다.
 	Watch(path string, changed func(), failed func(error)) (stop func() error, err error)
+	// MonotonicNanos is the system-wide monotonic clock in nanoseconds that the events carry as mono_ns: CLOCK_UPTIME_RAW on
+	// macOS and CLOCK_MONOTONIC on Linux. It is comparable across the processes of one boot (core docs/spec/logging.md#event).
+	MonotonicNanos() (uint64, error)
 }
 
 var (
