@@ -20,6 +20,9 @@
 //	      {"surface": id, "closed": true}
 //	      {"surface": id, "closed": true, "error": 메시지}
 //
+// A request may carry `cids`, the correlation identifiers of the inputs it continues; the reply lines that answer it carry the
+// same `cids` beside `surface` and `body`, and a failed request is the member `error` of the body.
+//
 // 세션은 감시하는 경로만 상태로 갖는다. Serve 는 입력이 닫히면 모든 감시를 끝내고 반환한다.
 package files
 
@@ -35,7 +38,9 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
+	"github.com/soksak-app/sidecar-files/src/events"
 	"github.com/soksak-app/sidecar-files/src/platform"
 	_ "github.com/soksak-app/sidecar-files/src/platform/darwin"
 	_ "github.com/soksak-app/sidecar-files/src/platform/linux"
@@ -46,8 +51,10 @@ import (
 type Request struct {
 	Surface string `json:"surface"`
 	Root    string `json:"root,omitempty"`
-	Closed  bool   `json:"closed,omitempty"`
-	Body    struct {
+	// Cids are the correlation identifiers of the inputs that the request continues. A reply carries them back.
+	Cids   []string `json:"cids,omitempty"`
+	Closed bool     `json:"closed,omitempty"`
+	Body   struct {
 		Operation string   `json:"operation"`
 		ID        string   `json:"id"`
 		Path      string   `json:"path"`
@@ -87,14 +94,17 @@ type EventBody struct {
 // Event 는 호스트에 보내는 메시지 하나다. 요청의 답과 변경은 Body 를, closed 의 답은 Closed 와 닫지 못한 까닭
 // Error 를 담는다(core 의 docs/spec/sidecars.md#messages).
 type Event struct {
-	Surface string     `json:"surface"`
-	Body    *EventBody `json:"body,omitempty"`
-	Closed  bool       `json:"closed,omitempty"`
-	Error   string     `json:"error,omitempty"`
+	Surface string `json:"surface"`
+	// Cids are the correlation identifiers of the request that the message answers; a change of a watch has none.
+	Cids   []string   `json:"cids,omitempty"`
+	Body   *EventBody `json:"body,omitempty"`
+	Closed bool       `json:"closed,omitempty"`
+	Error  string     `json:"error,omitempty"`
 }
 
-// Serve 는 in 이 닫힐 때까지 요청을 처리하고 답과 변경을 out 에 기록한다.
-func Serve(in io.Reader, out io.Writer) error {
+// Serve 는 in 이 닫힐 때까지 요청을 처리하고 답과 변경을 out 에 기록한다. 요청, 감시, git 호출은 log 에 event 로 남는다.
+// log 가 nil 이면 event 를 남기지 않는다.
+func Serve(in io.Reader, out io.Writer, log *events.Log) error {
 	var mu sync.Mutex
 	encoder := json.NewEncoder(out)
 	// 8 MiB 의 text 가 JSON 에서 커지는 것은 HTML 문자 escape 를 빼야 최대 6 배로 줄의 한도 안에 든다.
@@ -112,7 +122,7 @@ func Serve(in io.Reader, out io.Writer) error {
 		defer mu.Unlock()
 		return writeErr
 	}
-	watches := newWatches(send)
+	watches := newWatches(send, log)
 	defer watches.closeAll()
 	scanner := bufio.NewScanner(in)
 	// 요청 줄은 sidecar 출력 줄의 한도인 67108864 바이트까지다. 버퍼는 그 줄과 줄바꿈을 함께 담는다.
@@ -125,19 +135,25 @@ func Serve(in io.Reader, out io.Writer) error {
 		if request.Surface == "" {
 			return fmt.Errorf("request without surface: %s", scanner.Text())
 		}
+		trace := Trace{Log: log, Surface: request.Surface, Cids: request.Cids}
+		started := time.Now()
 		if request.Closed {
 			// 감시를 끝낸 뒤 모든 closed 에 답한다.
-			answer := Event{Surface: request.Surface, Closed: true}
-			if err := watches.set(request.Surface, "", nil); err != nil {
+			answer := Event{Surface: request.Surface, Cids: request.Cids, Closed: true}
+			err := watches.set(request.Surface, "", nil, "closed", trace)
+			if err != nil {
 				answer.Error = err.Error()
 			}
+			trace.request(request, "closed", started, err)
 			send(answer)
 		} else {
 			body := EventBody{ID: request.Body.ID}
-			if err := handle(watches, request, &body); err != nil {
+			err := handle(watches, request, &body, trace)
+			if err != nil {
 				body = EventBody{ID: request.Body.ID, Error: err.Error()}
 			}
-			send(Event{Surface: request.Surface, Body: &body})
+			trace.request(request, request.Body.Operation, started, err)
+			send(Event{Surface: request.Surface, Cids: request.Cids, Body: &body})
 		}
 		if err := written(); err != nil {
 			return err
@@ -146,7 +162,7 @@ func Serve(in io.Reader, out io.Writer) error {
 	return scanner.Err()
 }
 
-func handle(watches *watches, request Request, body *EventBody) error {
+func handle(watches *watches, request Request, body *EventBody, trace Trace) error {
 	if request.Root == "" {
 		return fmt.Errorf("%s requires a root", request.Body.Operation)
 	}
@@ -159,7 +175,7 @@ func handle(watches *watches, request Request, body *EventBody) error {
 		body.Entries = entries
 		return nil
 	case "git":
-		entries, err := GitStatus(request.Root)
+		entries, err := GitStatus(request.Root, trace)
 		if err != nil {
 			return err
 		}
@@ -174,7 +190,7 @@ func handle(watches *watches, request Request, body *EventBody) error {
 	case "writeBytes":
 		return writeBytesRequest(request, body)
 	case "watch":
-		return watches.set(request.Surface, request.Root, request.Body.Paths)
+		return watches.set(request.Surface, request.Root, request.Body.Paths, "replaced", trace)
 	default:
 		return fmt.Errorf("unknown operation %q", request.Body.Operation)
 	}
@@ -183,27 +199,41 @@ func handle(watches *watches, request Request, body *EventBody) error {
 // lineLimit 은 요청 줄의 최대 바이트 수다.
 const lineLimit = 67108864
 
-// watches 는 세션마다 감시 중인 경로의 멈춤 함수다.
+// watch 는 감시 중인 경로 하나다. path 는 요청이 쓴 상대 경로다.
+type watch struct {
+	path string
+	stop func() error
+}
+
+// watches 는 세션마다 감시 중인 경로다.
 type watches struct {
 	mu       sync.Mutex
 	send     func(Event)
-	sessions map[string][]func() error
+	log      *events.Log
+	sessions map[string][]watch
 }
 
-func newWatches(send func(Event)) *watches {
-	return &watches{send: send, sessions: map[string][]func() error{}}
+func newWatches(send func(Event), log *events.Log) *watches {
+	return &watches{send: send, log: log, sessions: map[string][]watch{}}
 }
 
-// set 은 세션의 감시를 paths 로 바꾼다. 경로 하나라도 실패하면 새 감시를 모두 끝내고 실패한다.
-func (w *watches) set(surface, root string, paths []string) error {
-	w.mu.Lock()
-	defer w.mu.Unlock()
+// end stops the watches of a surface and stores the end of each with the reason that ended it.
+func (w *watches) end(surface, reason string) error {
 	var errs []error
-	for _, stop := range w.sessions[surface] {
-		errs = append(errs, stop())
+	for _, started := range w.sessions[surface] {
+		err := started.stop()
+		errs = append(errs, err)
+		w.log.EmitHost(events.LevelInfo, "sidecar.files.watch_end", map[string]any{"surface": surface, "path": started.path, "reason": reason})
 	}
 	delete(w.sessions, surface)
-	if err := errors.Join(errs...); err != nil {
+	return errors.Join(errs...)
+}
+
+// set 은 세션의 감시를 paths 로 바꾼다. 경로 하나라도 실패하면 새 감시를 모두 끝내고 실패한다. 이전 감시는 reason 때문에 끝난다.
+func (w *watches) set(surface, root string, paths []string, reason string, trace Trace) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if err := w.end(surface, reason); err != nil {
 		return err
 	}
 	if len(paths) == 0 {
@@ -213,18 +243,20 @@ func (w *watches) set(surface, root string, paths []string) error {
 	if err != nil {
 		return err
 	}
-	stops := make([]func() error, 0, len(paths))
+	started := make([]watch, 0, len(paths))
 	for _, path := range paths {
 		stop, err := w.watch(current, surface, root, path)
 		if err != nil {
-			for _, started := range stops {
-				err = errors.Join(err, started())
+			for _, earlier := range started {
+				err = errors.Join(err, earlier.stop())
+				w.log.EmitHostCids(events.LevelInfo, "sidecar.files.watch_end", trace.Cids, map[string]any{"surface": surface, "path": earlier.path, "reason": "start failed"})
 			}
 			return err
 		}
-		stops = append(stops, stop)
+		started = append(started, watch{path: path, stop: stop})
+		w.log.EmitHostCids(events.LevelInfo, "sidecar.files.watch_start", trace.Cids, map[string]any{"surface": surface, "path": path})
 	}
-	w.sessions[surface] = stops
+	w.sessions[surface] = started
 	return nil
 }
 
@@ -243,23 +275,24 @@ func (w *watches) watch(current platform.Platform, surface, root, path string) (
 	}
 	changed := path
 	return current.Watch(target, func() {
+		w.log.EmitHost(events.LevelDebug, "sidecar.files.watch_change", map[string]any{"surface": surface, "path": changed})
 		w.send(Event{Surface: surface, Body: &EventBody{Changed: &changed}})
 	}, func(failure error) {
+		w.log.EmitHost(events.LevelError, "sidecar.files.watch_failed", map[string]any{"surface": surface, "path": changed, "error": failure.Error()})
 		w.send(Event{Surface: surface, Body: &EventBody{Error: failure.Error()}})
 	})
 }
 
+// closeAll ends every watch because the input closed. A watch that does not stop is reported to its surface and stored.
 func (w *watches) closeAll() {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	for surface, stops := range w.sessions {
-		for _, stop := range stops {
-			if err := stop(); err != nil {
-				w.send(Event{Surface: surface, Body: &EventBody{Error: err.Error()}})
-			}
+	for surface := range w.sessions {
+		if err := w.end(surface, "input closed"); err != nil {
+			w.log.EmitHost(events.LevelError, "sidecar.files.watch_failed", map[string]any{"surface": surface, "path": "", "error": err.Error()})
+			w.send(Event{Surface: surface, Body: &EventBody{Error: err.Error()}})
 		}
 	}
-	w.sessions = map[string][]func() error{}
 }
 
 // resolve 는 root 안의 상대 경로 path 를 심볼릭 링크를 따라간 절대 경로로 반환한다. root 를 벗어나면 실패한다.

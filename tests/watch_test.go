@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/soksak-app/sidecar-files/src/events"
 	"github.com/soksak-app/sidecar-files/src/files"
 )
 
@@ -23,12 +24,18 @@ type session struct {
 
 func startSession(t *testing.T) *session {
 	t.Helper()
+	return startSessionWith(t, nil)
+}
+
+// startSessionWith is startSession with the event log that Serve writes to.
+func startSessionWith(t *testing.T, log *events.Log) *session {
+	t.Helper()
 	inRead, inWrite := io.Pipe()
 	outRead, outWrite := io.Pipe()
 	s := &session{t: t, input: inWrite, events: make(chan files.Event, 64)}
 	done := make(chan error, 1)
 	go func() {
-		err := files.Serve(inRead, outWrite)
+		err := files.Serve(inRead, outWrite, log)
 		outWrite.Close()
 		done <- err
 	}()

@@ -314,6 +314,17 @@ func capFields(text json.RawMessage) (json.RawMessage, int) {
 	return cut, len(text)
 }
 
+// resultErrorBytes is the bound of the text of an error of the result form (docs/spec/logging.md#result-form).
+const resultErrorBytes = 1024
+
+// ResultError returns the `error` of an event of the result form: `<code>: <text>`, cut to 1,024 bytes on a character
+// boundary. A failure that has no code of its own has the internal code -32603.
+func ResultError(code int, text string) string {
+	// silent: the cut flag is not needed, the bound is the contract and the text is cut in place.
+	cut, _ := cutText(fmt.Sprintf("%d: %s", code, text), resultErrorBytes)
+	return cut
+}
+
 // countLoss counts an event that the queue refused because it was full.
 func (l *Log) countLoss(bytes int) {
 	l.lostEvents.Add(1)

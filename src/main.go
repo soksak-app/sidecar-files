@@ -52,7 +52,7 @@ func run(args []string, in io.Reader, out, stderr io.Writer) int {
 	routine.Use(log)
 	log.EmitHost(events.LevelInfo, "sidecar.files.start", map[string]any{"pid": os.Getpid(), "goos": runtime.GOOS, "goarch": runtime.GOARCH})
 	status := 0
-	if err := files.Serve(in, out); err != nil {
+	if err := files.Serve(in, out, log); err != nil {
 		fmt.Fprintf(stderr, "files sidecar: %v\n", err)
 		log.EmitHost(events.LevelError, "sidecar.files.failure", map[string]any{"error": err.Error()})
 		status = 1

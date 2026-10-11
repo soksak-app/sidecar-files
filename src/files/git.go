@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 )
 
 // GitEntry 는 git 상태가 있는 경로 하나다. 경로는 root 기준이다.
@@ -21,12 +22,12 @@ const notRepository = 128
 
 // GitStatus 는 root 의 git 상태를 root 기준 경로로 반환한다. root 가 저장소 안에 있지 않거나 git 이
 // 설치되지 않았으면 빈 목록이다(docs/spec/sidecars.md#files). 다른 실패는 오류다.
-func GitStatus(root string) ([]GitEntry, error) {
+func GitStatus(root string, trace Trace) ([]GitEntry, error) {
 	base, err := filepath.EvalSymlinks(root)
 	if err != nil {
 		return nil, err
 	}
-	top, err := git(base, "rev-parse", "--show-toplevel")
+	top, err := git(trace, base, "rev-parse", "--show-toplevel")
 	if err != nil {
 		var exit *exec.ExitError
 		if errors.Is(err, exec.ErrNotFound) || (errors.As(err, &exit) && exit.ExitCode() == notRepository) {
@@ -38,7 +39,7 @@ func GitStatus(root string) ([]GitEntry, error) {
 	if err != nil {
 		return nil, err
 	}
-	out, err := git(base, "status", "--porcelain=v1", "-z", "--untracked-files=all")
+	out, err := git(trace, base, "status", "--porcelain=v1", "-z", "--untracked-files=all")
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +87,9 @@ func statusOf(code string) string {
 	}
 }
 
-func git(dir string, args ...string) ([]byte, error) {
+// git runs git in dir and stores the call as an event of trace.
+func git(trace Trace, dir string, args ...string) ([]byte, error) {
+	started := time.Now()
 	cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
@@ -94,9 +97,13 @@ func git(dir string, args ...string) ([]byte, error) {
 	if err != nil {
 		var exit *exec.ExitError
 		if errors.As(err, &exit) {
-			return nil, fmt.Errorf("git %s: %w: %s", strings.Join(args, " "), err, strings.TrimSpace(stderr.String()))
+			err = fmt.Errorf("git %s: %w: %s", strings.Join(args, " "), err, strings.TrimSpace(stderr.String()))
+			trace.git(strings.Join(args, " "), exit.ExitCode(), started, err)
+		} else {
+			trace.git(strings.Join(args, " "), internalCode, started, err)
 		}
 		return nil, err
 	}
+	trace.git(strings.Join(args, " "), 0, started, nil)
 	return out, nil
 }

@@ -25,7 +25,7 @@ func textReply(t *testing.T, root string, body map[string]any) map[string]any {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
-	if err := files.Serve(bytes.NewReader(append(line, '\n')), &out); err != nil {
+	if err := files.Serve(bytes.NewReader(append(line, '\n')), &out, nil); err != nil {
 		t.Fatalf("serve: %v", err)
 	}
 	var event map[string]any
@@ -87,13 +87,13 @@ func TestServeReadsRequestLinesUpTo64MiB(t *testing.T) {
 		return string(line[:len(line)-1]) + strings.Repeat(" ", length-len(line)) + "}"
 	}
 	var out bytes.Buffer
-	if err := files.Serve(strings.NewReader(padded(67108864)+"\n"), &out); err != nil {
+	if err := files.Serve(strings.NewReader(padded(67108864)+"\n"), &out, nil); err != nil {
 		t.Fatalf("serve of a 67108864-byte line: %v", err)
 	}
 	if !strings.Contains(out.String(), `"id":"l","entries"`) {
 		t.Fatalf("reply to a 67108864-byte line = %.200s", out.String())
 	}
-	if err := files.Serve(strings.NewReader(padded(67108865)+"\n"), &out); err == nil {
+	if err := files.Serve(strings.NewReader(padded(67108865)+"\n"), &out, nil); err == nil {
 		t.Fatal("a 67108865-byte line was accepted")
 	}
 }

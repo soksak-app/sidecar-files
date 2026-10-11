@@ -16,7 +16,7 @@ import (
 func serve(t *testing.T, lines ...string) []files.Event {
 	t.Helper()
 	var out bytes.Buffer
-	if err := files.Serve(strings.NewReader(strings.Join(lines, "\n")+"\n"), &out); err != nil {
+	if err := files.Serve(strings.NewReader(strings.Join(lines, "\n")+"\n"), &out, nil); err != nil {
 		t.Fatalf("serve: %v", err)
 	}
 	var events []files.Event
@@ -99,7 +99,7 @@ func TestClosedIsAnsweredAfterItsWatchesEnd(t *testing.T) {
 	root := t.TempDir()
 	var out bytes.Buffer
 	input := request(t, root, "r1", ".") + "\n" + `{"surface":"state:files:p1","root":"` + root + `","closed":true}` + "\n"
-	if err := files.Serve(strings.NewReader(input), &out); err != nil {
+	if err := files.Serve(strings.NewReader(input), &out, nil); err != nil {
 		t.Fatalf("serve: %v", err)
 	}
 	lines := strings.Split(strings.TrimSpace(out.String()), "\n")

@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/soksak-app/sidecar-files/src/events"
 )
@@ -473,5 +474,16 @@ func TestALevelOutsideTheContractIsRefused(t *testing.T) {
 	lines := finish(t, log)
 	if lines[len(lines)-1].Event != "log.dropped" {
 		t.Fatalf("lines %+v", lines)
+	}
+}
+
+// contract: log.result.error-is-a-code-and-a-text-cut-to-the-bound
+func TestResultErrorIsTheCodeAndTheTextCutToTheBound(t *testing.T) {
+	if got := events.ResultError(-32603, "refused"); got != "-32603: refused" {
+		t.Fatalf("got %q", got)
+	}
+	long := events.ResultError(128, strings.Repeat("é", 2000))
+	if len(long) > 1024 || !strings.HasPrefix(long, "128: é") || !utf8.ValidString(long) {
+		t.Fatalf("got %d bytes, valid %v", len(long), utf8.ValidString(long))
 	}
 }
