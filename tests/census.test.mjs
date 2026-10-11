@@ -2,10 +2,10 @@
 // fail for a source that has neither an event nor a reason.
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { copyFileSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import test from "node:test";
+import test, { after } from "node:test";
 
 const root = new URL("../", import.meta.url).pathname;
 const command = join(root, "node_modules/.bin/soksak-events");
@@ -16,9 +16,13 @@ function guard(repository) {
   return { status: result.status, stderr: result.stderr, stdout: result.stdout };
 }
 
+const directories = [];
+after(() => directories.forEach((directory) => rmSync(directory, { recursive: true })));
+
 /** A tracked copy of the declarations with one extra Go source. */
 function repositoryWith(source) {
   const directory = mkdtempSync(join(tmpdir(), "files-census-"));
+  directories.push(directory);
   for (const file of ["census.json", "events.json"]) copyFileSync(join(root, file), join(directory, file));
   mkdirSync(join(directory, "src"));
   writeFileSync(join(directory, "src/extra.go"), source);

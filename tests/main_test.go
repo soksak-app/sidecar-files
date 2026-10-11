@@ -3,6 +3,7 @@ package files_test
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -16,6 +17,18 @@ var (
 	builtPath  string
 	buildError error
 )
+
+// TestMain removes the folder of the built sidecar after the tests, so no binary stays in the temporary folder.
+func TestMain(m *testing.M) {
+	code := m.Run()
+	if builtPath != "" {
+		if err := os.RemoveAll(filepath.Dir(builtPath)); err != nil {
+			fmt.Fprintf(os.Stderr, "remove the built sidecar: %v\n", err)
+			code = 1
+		}
+	}
+	os.Exit(code)
+}
 
 // sidecarBinary builds the sidecar once for the tests that run it as a process.
 func sidecarBinary(t *testing.T) string {
