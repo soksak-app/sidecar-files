@@ -9,6 +9,7 @@ package events
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime/debug"
@@ -67,6 +68,11 @@ type Options struct {
 	// Classes gives the class of each event name that the catalog declares (ClassesOfCatalog). The policy gates the events it
 	// names; an event it does not name has no class and no gate.
 	Classes map[string]Class
+	// PolicyFile is the policy file log-policy.json, in the parent folder of the log folder (docs/spec/logging.md#policy-file).
+	// Start reads it, WatchPolicy watches it, and an empty value gives the writer the default policy only. PolicyReport
+	// receives an error record of the place `log policy` for a file that is refused.
+	PolicyFile   string
+	PolicyReport io.Writer
 	// Write stores a batch in the file. A test replaces it to cause a failed write.
 	Write func(file *os.File, data []byte) error
 }
@@ -134,7 +140,9 @@ type Log struct {
 	policyMu      sync.Mutex
 	policyApplied bool
 	policyEvents  []*pendingEvent
-	gated         [5][5]atomic.Uint64
+	// startRefused is the refusal of the policy file at the start, which Start reported.
+	startRefused string
+	gated        [5][5]atomic.Uint64
 }
 
 // Start creates the folder (mode 0700) and the file Directory/<Role>-<boot>.jsonl (mode 0600, created new), and starts the
@@ -143,6 +151,9 @@ type Log struct {
 func Start(options Options) (*Log, error) {
 	if options.Directory == "" || options.Role == "" || options.MonotonicNanos == nil || options.Write == nil {
 		return nil, fmt.Errorf("event log options need a directory, a role, a clock and a write function")
+	}
+	if options.PolicyFile != "" && options.PolicyReport == nil {
+		return nil, fmt.Errorf("event log options with a policy file need a report for its refusals")
 	}
 	if options.QueueEvents < 1 || options.QueueBytes < 1 || options.BatchInterval <= 0 || options.RotateBytes < 1 || options.Generations < 1 {
 		return nil, fmt.Errorf("event log options need positive bounds, found %+v", options)
@@ -169,7 +180,11 @@ func Start(options Options) (*Log, error) {
 	}
 	open := log.openEvent()
 	// The default policy is in force until a policy file says otherwise, and it is the first log.policy of the run.
-	log.ApplyPolicy(DefaultPolicy(), "default")
+	if options.PolicyFile != "" {
+		log.loadPolicyAtStart()
+	} else {
+		log.ApplyPolicy(DefaultPolicy(), "default")
+	}
 	// The writer is the one goroutine of this package. A panic in it cannot be recorded by the event file itself, so the
 	// text goes to the standard error, which the host stores, and the process ends.
 	go func() {

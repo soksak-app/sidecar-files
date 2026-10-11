@@ -4,6 +4,7 @@
 
 ## 미배포
 
+- S18.5.2: 사이드카가 시작할 때 `--log-dir`의 부모 폴더의 `log-policy.json`을 읽고 플랫폼의 파일 시스템 event로 감시한다. 생성, 쓰기, 교체, 이름 변경은 그 정책을 적용하고, 삭제는 기본 정책을 되살리며, 빈 파일은 기다리고, 거부된 파일은 `error: log policy: <글>`로 한 번 보고한다. 정규 파일에 대한 inotify 감시가 쓰기를 알린다.
 - S18.5.1: 기록기가 core의 규칙대로 정책을 읽고(`events.ParsePolicy`), catalog의 각 event를 field를 만들기 전에 class와 level로 gate에 통과시키며, `log.policy`(첫 정책과 모든 변경)와 `log.gated`(gate가 만들지 않은 event의 정확한 수)를 저장한다. `tests/fixtures/policy/cases.json`은 core가 소유한 골든 사례의 사본이다.
 - S18.4: `events.json`이 사이드카의 event를 선언하고 `sidecar.json`이 `events`로 가리킨다. `make test`가 `census.json`으로 `soksak-events`의 census와 카탈로그 검사를 실행한다. `@soksak/plugin-api`는 이 명령이 있는 core commit에서 받는다.
 - S18.3: `Serve`가 `sidecar.files.request`(operation, 결과, `micros`, `<code>: <text>`인 `error`), 감시 event, `sidecar.files.git`를 요청의 `cids`와 함께 저장하고, 각 답 줄이 `surface`와 `body` 옆에 요청의 `cids`를 싣는다.

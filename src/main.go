@@ -2,7 +2,7 @@
 // in docs/spec/sidecars.md of the soksak core repository. The sidecar ends when the standard input closes.
 //
 // The argument --log-dir is the folder of the event file files-<boot>.jsonl, which the host names as the logs folder of the
-// configuration directory.
+// configuration directory. The policy file log-policy.json is in the parent folder of that folder.
 package main
 
 import (
@@ -10,8 +10,10 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"runtime"
 
+	catalog "github.com/soksak-app/sidecar-files"
 	"github.com/soksak-app/sidecar-files/src/events"
 	"github.com/soksak-app/sidecar-files/src/files"
 	"github.com/soksak-app/sidecar-files/src/platform"
@@ -44,9 +46,29 @@ func run(args []string, in io.Reader, out, stderr io.Writer) int {
 			fmt.Fprintf(stderr, "files sidecar: %v\n", err)
 			return 1
 		}
-		if log, err = events.Start(events.DefaultOptions(*logDir, "files", current.MonotonicNanos)); err != nil {
+		classes, err := events.ClassesOfCatalog(catalog.Events)
+		if err != nil {
+			fmt.Fprintf(stderr, "files sidecar: %v\n", err)
+			return 1
+		}
+		options := events.DefaultOptions(*logDir, "files", current.MonotonicNanos)
+		options.Classes = classes
+		options.PolicyFile = filepath.Join(filepath.Dir(filepath.Clean(*logDir)), "log-policy.json")
+		options.PolicyReport = stderr
+		if log, err = events.Start(options); err != nil {
 			fmt.Fprintf(stderr, "files sidecar: event file: %v\n", err)
 			return 1
+		}
+		// A watch that cannot start leaves the policy of the start in force; the failure is reported and the sidecar serves.
+		stopWatch, err := log.WatchPolicy(current.Watch)
+		if err != nil {
+			fmt.Fprintf(stderr, "files sidecar: policy file: %v\n", err)
+		} else {
+			defer func() {
+				if err := stopWatch(); err != nil {
+					fmt.Fprintf(stderr, "files sidecar: policy file: %v\n", err)
+				}
+			}()
 		}
 	}
 	routine.Use(log)

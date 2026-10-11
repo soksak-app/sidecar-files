@@ -20,13 +20,26 @@ func init() { platform.Register(implementation{}) }
 const watched = syscall.IN_CREATE | syscall.IN_DELETE | syscall.IN_MOVED_FROM | syscall.IN_MOVED_TO |
 	syscall.IN_DELETE_SELF | syscall.IN_MOVE_SELF | syscall.IN_ONLYDIR
 
-// Watch 는 디렉터리에 inotify 감시를 걸고, 멈춤 신호를 받을 파이프와 함께 epoll 로 기다린다.
+// watchedFile is the change of a regular file that the platform interface reports: a write, and the removal or the move of the
+// file itself.
+const watchedFile = syscall.IN_MODIFY | syscall.IN_CLOSE_WRITE | syscall.IN_DELETE_SELF | syscall.IN_MOVE_SELF
+
+// Watch 는 디렉터리나 정규 파일에 inotify 감시를 걸고, 멈춤 신호를 받을 파이프와 함께 epoll 로 기다린다. 정규 파일은 내용의
+// 쓰기를 알린다.
 func (implementation) Watch(dir string, changed func(), failed func(error)) (func() error, error) {
+	var stat syscall.Stat_t
+	if err := syscall.Stat(dir, &stat); err != nil {
+		return nil, fmt.Errorf("stat %s: %w", dir, err)
+	}
+	mask := uint32(watched)
+	if stat.Mode&syscall.S_IFMT == syscall.S_IFREG {
+		mask = watchedFile
+	}
 	notify, err := syscall.InotifyInit1(syscall.IN_CLOEXEC)
 	if err != nil {
 		return nil, fmt.Errorf("inotify: %w", err)
 	}
-	if _, err := syscall.InotifyAddWatch(notify, dir, watched); err != nil {
+	if _, err := syscall.InotifyAddWatch(notify, dir, mask); err != nil {
 		return nil, errors.Join(fmt.Errorf("watch %s: %w", dir, err), syscall.Close(notify))
 	}
 	var pipe [2]int

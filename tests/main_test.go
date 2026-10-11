@@ -133,3 +133,28 @@ func TestAnUnknownArgumentIsRefused(t *testing.T) {
 		t.Fatalf("status %d, standard error %q", status, stderr)
 	}
 }
+
+// contract: log.policy.sidecar-reads-the-file-beside-the-log-folder
+func TestTheSidecarAppliesThePolicyFileOfTheParentOfTheLogFolder(t *testing.T) {
+	config := t.TempDir()
+	if err := os.WriteFile(filepath.Join(config, "log-policy.json"), []byte(policyText(map[string]string{"call": "off"})), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	folder := filepath.Join(config, "logs")
+	root := t.TempDir()
+	request := requestWith(t, []string{"b1.1"}, root, map[string]any{"operation": "list", "id": "l1", "path": ""})
+	if stderr, status := runSidecar(t, request+"\n", "--log-dir", folder); status != 0 || stderr != "" {
+		t.Fatalf("status %d, standard error %q", status, stderr)
+	}
+	lines := onlyEventFile(t, folder)
+	if len(eventsNamed(lines, "sidecar.files.request")) != 0 {
+		t.Fatalf("a request was stored while the class call is off: %+v", lines)
+	}
+	if sourcesOf(lines) != "file" {
+		t.Fatalf("log.policy events %+v", policies(lines))
+	}
+	gated := eventsNamed(lines, "log.gated")
+	if len(gated) != 1 || gated[0].Fields["class"] != "call" || gated[0].Fields["level"] != "info" || gated[0].Fields["count"] != float64(1) {
+		t.Fatalf("log.gated %+v", gated)
+	}
+}
