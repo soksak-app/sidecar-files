@@ -23,6 +23,20 @@
       "fields": { "bytes": "number", "kept": "number", "removed": "string|null" },
       "description": "A file was closed and a new file started."
     },
+    "log.policy": {
+      "layer": "sidecar",
+      "class": "lifecycle",
+      "level": "info",
+      "fields": { "source": "string", "classes": "object" },
+      "description": "The first policy of the run and each change of it; source is default or file, and classes holds the level of every class."
+    },
+    "log.gated": {
+      "layer": "sidecar",
+      "class": "lifecycle",
+      "level": "info",
+      "fields": { "class": "string", "level": "string", "count": "number" },
+      "description": "The exact number of events of this class and level that the policy did not store since the earlier report; the events were not built."
+    },
     "sidecar.files.start": {
       "layer": "sidecar",
       "class": "lifecycle",

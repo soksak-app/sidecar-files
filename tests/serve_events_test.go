@@ -201,3 +201,32 @@ func TestEachGitCallIsAnEventWithItsResult(t *testing.T) {
 		}
 	}
 }
+
+// contract: log.policy.producers-ask-the-gate
+func TestAPolicyThatTurnsTheCallClassOffStoresNoRequestAndCountsEachOne(t *testing.T) {
+	root := t.TempDir()
+	log := startGatedLog(t)
+	log.ApplyPolicy(mustPolicy(t, map[string]string{"call": "off"}), "file")
+	var out bytes.Buffer
+	lines := []string{
+		requestWith(t, []string{"b1.1"}, root, map[string]any{"operation": "list", "id": "l1", "path": ""}),
+		requestWith(t, nil, root, map[string]any{"operation": "list", "id": "l2", "path": "missing"}),
+	}
+	if err := files.Serve(strings.NewReader(strings.Join(lines, "\n")+"\n"), &out, log); err != nil {
+		t.Fatal(err)
+	}
+	stored := finish(t, log)
+	if len(eventsNamed(stored, "sidecar.files.request")) != 0 {
+		t.Fatalf("a request was stored while the class call is off: %+v", stored)
+	}
+	counts := map[string]float64{}
+	for _, gated := range eventsNamed(stored, "log.gated") {
+		counts[gated.Fields["class"].(string)+" "+gated.Fields["level"].(string)] = gated.Fields["count"].(float64)
+	}
+	if counts["call info"] != 1 || counts["call warn"] != 1 {
+		t.Fatalf("counts %v, want one info and one warn", counts)
+	}
+	if got := len(strings.Split(strings.TrimSpace(out.String()), "\n")); got != 2 {
+		t.Fatalf("%d reply lines, want 2: the policy gates events and not replies", got)
+	}
+}

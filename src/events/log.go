@@ -64,6 +64,9 @@ type Options struct {
 	// RotateBytes is the size at which the file is closed, and Generations the number of earlier files that are kept.
 	RotateBytes int64
 	Generations int
+	// Classes gives the class of each event name that the catalog declares (ClassesOfCatalog). The policy gates the events it
+	// names; an event it does not name has no class and no gate.
+	Classes map[string]Class
 	// Write stores a batch in the file. A test replaces it to cause a failed write.
 	Write func(file *os.File, data []byte) error
 }
@@ -125,6 +128,13 @@ type Log struct {
 	done          chan struct{}
 	closeOnce     sync.Once
 	clockFailure  sync.Once
+	// policy is the policy in force. policyApplied is whether one was applied, and policyEvents are the log.policy events that
+	// wait for the writer; policyMu guards the three. gated counts the events that the gate refused, by class and level.
+	policy        atomic.Pointer[Policy]
+	policyMu      sync.Mutex
+	policyApplied bool
+	policyEvents  []*pendingEvent
+	gated         [5][5]atomic.Uint64
 }
 
 // Start creates the folder (mode 0700) and the file Directory/<Role>-<boot>.jsonl (mode 0600, created new), and starts the
@@ -158,6 +168,8 @@ func Start(options Options) (*Log, error) {
 		done:     make(chan struct{}),
 	}
 	open := log.openEvent()
+	// The default policy is in force until a policy file says otherwise, and it is the first log.policy of the run.
+	log.ApplyPolicy(DefaultPolicy(), "default")
 	// The writer is the one goroutine of this package. A panic in it cannot be recorded by the event file itself, so the
 	// text goes to the standard error, which the host stores, and the process ends.
 	go func() {
@@ -221,7 +233,8 @@ func checkCids(cids []string) error {
 
 // EmitHost queues an event. It returns false, and counts the loss, when the queue has no room or the event is invalid. It
 // never waits. The fields are serialized once, and only after the queue is known to have room for another event. The name
-// is the entrance name that the census of soksak-events recognizes.
+// is the entrance name that the census of soksak-events recognizes. An event that the policy does not store is counted for
+// log.gated and not queued; the fields may be a `func() map[string]any`, which runs only for an event that the policy stores.
 func (l *Log) EmitHost(level Level, event string, fields any) bool {
 	return l.emit(level, event, nil, fields)
 }
@@ -245,6 +258,9 @@ func (l *Log) emit(level Level, event string, cids []string, fields any) bool {
 		fmt.Fprintf(os.Stderr, "event writer: %s has the level %q, which the contract does not define\n", event, string(level))
 		return false
 	}
+	if !l.gate(event, level) {
+		return false
+	}
 	if err := checkCids(cids); err != nil {
 		l.refuse(len(event))
 		fmt.Fprintf(os.Stderr, "event writer: the cids of %s are refused: %v\n", event, err)
@@ -253,6 +269,10 @@ func (l *Log) emit(level Level, event string, cids []string, fields any) bool {
 	if l.queuedEvents.Load() >= int64(l.options.QueueEvents) {
 		l.countLoss(len(event))
 		return false
+	}
+	// A builder runs only for an event that the policy stores.
+	if build, ok := fields.(func() map[string]any); ok {
+		fields = build()
 	}
 	text, err := json.Marshal(fields)
 	if err != nil {
@@ -495,9 +515,18 @@ func (l *Log) run(file *os.File, first *pendingEvent) {
 			if open == nil {
 				open = l.openEvent()
 			}
+			// The first policy of the run follows the log.open of the first file, so the file says what it stores from its
+			// second line.
+			policies := []*pendingEvent(nil)
+			if first != nil {
+				policies = l.takePolicyEvents()
+			}
 			first = nil
 			appendLine(open)
 			inBatchOpen = true
+			for _, e := range policies {
+				appendLine(e)
+			}
 			if rotated != nil {
 				appendLine(rotated)
 				rotated = nil
@@ -582,8 +611,18 @@ func (l *Log) run(file *os.File, first *pendingEvent) {
 		record(l.lostEvents.Swap(0), l.lostBytes.Swap(0), "the queue was full")
 		record(l.refusedEvents.Swap(0), l.refusedBytes.Swap(0), "the event was refused as invalid")
 	}
+	// recordPolicy stores the log.policy events and the counts of log.gated. They are events of the writer and pass every gate.
+	recordPolicy := func() {
+		for _, e := range l.takePolicyEvents() {
+			push(e)
+		}
+		for _, count := range l.takeGated() {
+			push(l.gatedEvent(count))
+		}
+	}
 	write := func() {
 		recordLoss()
+		recordPolicy()
 		flush()
 	}
 	take := func(e *pendingEvent) {

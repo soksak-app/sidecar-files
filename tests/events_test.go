@@ -159,7 +159,7 @@ func TestAnEventLineKeepsTheKeyOrderOfTheGoldenLine(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	own := keysOf(t, strings.Split(strings.TrimSpace(string(text)), "\n")[1])
+	own := keysOf(t, strings.Split(strings.TrimSpace(string(text)), "\n")[2])
 	var kept []string
 	for _, key := range keysOf(t, fixtureLines(t, "key.jsonl")[3]) {
 		for _, name := range own {
@@ -217,7 +217,7 @@ func TestCidsAreStoredAndAnInvalidListIsRefusedAndCounted(t *testing.T) {
 		}
 	}
 	lines := finish(t, log)
-	if len(lines) < 3 || strings.Join(lines[1].Cids, ",") != "b3.1042,b3.1043" {
+	if len(lines) < 4 || strings.Join(lines[2].Cids, ",") != "b3.1042,b3.1043" {
 		t.Fatalf("lines %+v", lines)
 	}
 	dropped := lines[len(lines)-1]
@@ -233,15 +233,15 @@ func TestFieldsAreEscapedAndAnOversizeEventIsCut(t *testing.T) {
 	log.EmitHost(events.LevelInfo, "sidecar.files.start", map[string]any{"args": text})
 	log.EmitHost(events.LevelInfo, "sidecar.files.start", map[string]any{"args": strings.Repeat("a", 1<<20)})
 	lines := finish(t, log)
-	if len(lines) != 3 {
+	if len(lines) != 4 {
 		t.Fatalf("%d lines", len(lines))
 	}
-	if lines[1].Fields["args"] != text {
-		t.Fatalf("args %q", lines[1].Fields["args"])
+	if lines[2].Fields["args"] != text {
+		t.Fatalf("args %q", lines[2].Fields["args"])
 	}
-	head, _ := lines[2].Fields["head"].(string)
-	if lines[2].Truncated <= 1<<20 || len(head) != 4096 || len(lines[2].Fields) != 1 {
-		t.Fatalf("truncated %d, head %d bytes, %d fields", lines[2].Truncated, len(head), len(lines[2].Fields))
+	head, _ := lines[3].Fields["head"].(string)
+	if lines[3].Truncated <= 1<<20 || len(head) != 4096 || len(lines[3].Fields) != 1 {
+		t.Fatalf("truncated %d, head %d bytes, %d fields", lines[3].Truncated, len(head), len(lines[3].Fields))
 	}
 }
 
@@ -360,7 +360,7 @@ func TestCloseWritesWhatIsQueued(t *testing.T) {
 	log.EmitHost(events.LevelInfo, "sidecar.files.start", map[string]any{"i": 1})
 	log.Close()
 	lines := readEvents(t, log.Path())
-	if len(lines) != 2 || lines[1].Event != "sidecar.files.start" {
+	if len(lines) != 3 || lines[2].Event != "sidecar.files.start" {
 		t.Fatalf("lines %+v", lines)
 	}
 	if log.EmitHost(events.LevelInfo, "sidecar.files.start", map[string]any{"i": 2}) {
@@ -424,7 +424,7 @@ func TestAFailedWriteIsCountedAndExplainedByLogDropped(t *testing.T) {
 		}
 	})
 	failures.Store(1)
-	// The batch with log.open and the first event fails.
+	// The batch with log.open, the first log.policy and the first event fails.
 	log.EmitHost(events.LevelInfo, "sidecar.files.start", map[string]any{"i": 1})
 	if err := log.Flush(5 * time.Second); err != nil {
 		t.Fatal(err)
@@ -441,16 +441,16 @@ func TestAFailedWriteIsCountedAndExplainedByLogDropped(t *testing.T) {
 		t.Fatalf("no log.dropped in %+v", lines)
 	}
 	// The file holds no line of the failed batch, so it starts with a new log.open, which the log.dropped follows.
-	if dropped.Fields["from_seq"] != float64(1) || dropped.Fields["to_seq"] != float64(2) || dropped.Fields["count"] != float64(2) || dropped.Seq != 4 {
+	if dropped.Fields["from_seq"] != float64(1) || dropped.Fields["to_seq"] != float64(3) || dropped.Fields["count"] != float64(3) || dropped.Seq != 5 {
 		t.Fatalf("log.dropped %+v", dropped)
 	}
-	if lines[0].Event != "log.open" || lines[0].Seq != 3 {
+	if lines[0].Event != "log.open" || lines[0].Seq != 4 {
 		t.Fatalf("the file starts with %+v", lines[0])
 	}
 	if reason, _ := dropped.Fields["reason"].(string); !strings.Contains(reason, "write failed on purpose") {
 		t.Fatalf("reason %q", reason)
 	}
-	if lines[len(lines)-1].Fields["i"] != float64(2) || lines[len(lines)-1].Seq != 5 {
+	if lines[len(lines)-1].Fields["i"] != float64(2) || lines[len(lines)-1].Seq != 6 {
 		t.Fatalf("the event after the loss %+v", lines[len(lines)-1])
 	}
 }

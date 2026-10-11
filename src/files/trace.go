@@ -26,8 +26,15 @@ func level(err error) events.Level {
 	return events.LevelInfo
 }
 
-// request stores the result of a request: the operation, the identifiers it names and the time since started.
+// request stores the result of a request: the operation, the identifiers it names and the time since started. The fields are
+// built by a function that runs only when the policy stores the event.
 func (t Trace) request(request Request, operation string, started time.Time, err error) {
+	t.Log.EmitHostCids(level(err), "sidecar.files.request", t.Cids, func() map[string]any {
+		return requestFields(request, operation, started, err)
+	})
+}
+
+func requestFields(request Request, operation string, started time.Time, err error) map[string]any {
 	fields := map[string]any{"surface": request.Surface, "operation": operation, "ok": err == nil, "micros": time.Since(started).Microseconds()}
 	if request.Body.ID != "" {
 		fields["id"] = request.Body.ID
@@ -41,14 +48,16 @@ func (t Trace) request(request Request, operation string, started time.Time, err
 	if err != nil {
 		fields["error"] = events.ResultError(internalCode, err.Error())
 	}
-	t.Log.EmitHostCids(level(err), "sidecar.files.request", t.Cids, fields)
+	return fields
 }
 
 // git stores the result of one call of git: its arguments, the time it took and, for a failure, the exit status as the code.
 func (t Trace) git(args string, code int, started time.Time, err error) {
-	fields := map[string]any{"surface": t.Surface, "args": args, "ok": err == nil, "micros": time.Since(started).Microseconds()}
-	if err != nil {
-		fields["error"] = events.ResultError(code, err.Error())
-	}
-	t.Log.EmitHostCids(level(err), "sidecar.files.git", t.Cids, fields)
+	t.Log.EmitHostCids(level(err), "sidecar.files.git", t.Cids, func() map[string]any {
+		fields := map[string]any{"surface": t.Surface, "args": args, "ok": err == nil, "micros": time.Since(started).Microseconds()}
+		if err != nil {
+			fields["error"] = events.ResultError(code, err.Error())
+		}
+		return fields
+	})
 }

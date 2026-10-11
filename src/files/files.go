@@ -275,7 +275,7 @@ func (w *watches) watch(current platform.Platform, surface, root, path string) (
 	}
 	changed := path
 	return current.Watch(target, func() {
-		w.log.EmitHost(events.LevelDebug, "sidecar.files.watch_change", map[string]any{"surface": surface, "path": changed})
+		w.log.EmitHost(events.LevelDebug, "sidecar.files.watch_change", func() map[string]any { return map[string]any{"surface": surface, "path": changed} })
 		w.send(Event{Surface: surface, Body: &EventBody{Changed: &changed}})
 	}, func(failure error) {
 		w.log.EmitHost(events.LevelError, "sidecar.files.watch_failed", map[string]any{"surface": surface, "path": changed, "error": failure.Error()})
