@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -126,7 +127,15 @@ func finish(t *testing.T, log *events.Log) []loggedEvent {
 	if err := log.Flush(5 * time.Second); err != nil {
 		t.Fatal(err)
 	}
-	return readEvents(t, log.Path())
+	// The levels of the debug channel are in the debug file; the order of the two files is the order of their seq.
+	lines := readEvents(t, log.Path())
+	if _, err := os.Stat(log.DebugPath()); err == nil {
+		lines = append(lines, readEvents(t, log.DebugPath())...)
+		lines = slices.SortedStableFunc(slices.Values(lines), func(a, b loggedEvent) int {
+			return int(a.Seq) - int(b.Seq)
+		})
+	}
+	return lines
 }
 
 // contract: log.writer.assigns-seq-and-opens-with-log-open
@@ -155,6 +164,59 @@ func TestTheFileOpensWithLogOpenAndTheNameFollowsTheContract(t *testing.T) {
 	}
 	if lines[1].Seq != 2 || lines[1].Layer != "sidecar" {
 		t.Fatalf("event %+v", lines[1])
+	}
+}
+
+// contract: log.writer.debug-file
+func TestTheLevelsOfTheDebugChannelGoToTheDebugFileWithOneSeqAcrossBoth(t *testing.T) {
+	log := startLog(t, nil)
+	log.EmitHost(events.LevelInfo, "sidecar.files.start", map[string]any{"pid": 1, "platform": "x"})
+	log.EmitHost(events.LevelDebug, "sidecar.files.watch_change", map[string]any{"surface": "s", "path": "a"})
+	log.EmitHost(events.LevelWarn, "sidecar.files.watch_failed", map[string]any{"surface": "s", "path": "a", "error": "e"})
+	log.EmitHost(events.LevelTrace, "an.unknown.trace", map[string]any{})
+	if err := log.Flush(5 * time.Second); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(log.DebugPath()); err != nil {
+		t.Fatalf("the debug file holds no levels of the debug channel: %v", err)
+	}
+	lines := readEvents(t, log.Path())
+	debugLines := readEvents(t, log.DebugPath())
+	if debugLines[0].Event != "log.open" {
+		t.Fatalf("the debug file opens with %s", debugLines[0].Event)
+	}
+	in := func(lines []loggedEvent, name string) *loggedEvent {
+		for at := range lines {
+			if lines[at].Event == name {
+				return &lines[at]
+			}
+		}
+		return nil
+	}
+	if in(lines, "sidecar.files.start") == nil || in(lines, "sidecar.files.watch_failed") == nil {
+		t.Fatalf("the main file holds %v", lines)
+	}
+	if in(lines, "sidecar.files.watch_change") != nil || in(lines, "sidecar.files.start").Level == "debug" {
+		t.Fatalf("the main file holds a level of the debug channel: %v", lines)
+	}
+	if in(debugLines, "sidecar.files.watch_change") == nil || in(debugLines, "an.unknown.trace") == nil {
+		t.Fatalf("the debug file holds %v", debugLines)
+	}
+	if in(debugLines, "sidecar.files.start") != nil {
+		t.Fatalf("the debug file holds a level of the main channel: %v", debugLines)
+	}
+	all := append(append([]loggedEvent{}, lines...), debugLines...)
+	seen := map[uint64]bool{}
+	for _, line := range all {
+		if line.Seq == 0 || seen[line.Seq] {
+			t.Fatalf("seq %d is zero or appears twice", line.Seq)
+		}
+		seen[line.Seq] = true
+	}
+	for at := uint64(1); at <= uint64(len(all)); at++ {
+		if !seen[at] {
+			t.Fatalf("seq %d of the two files is missing", at)
+		}
 	}
 }
 

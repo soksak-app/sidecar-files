@@ -134,6 +134,7 @@ type Log struct {
 	refusedBytes  atomic.Uint64
 	closed        atomic.Bool
 	path          string
+	debugPath     string
 	boot          string
 	done          chan struct{}
 	closeOnce     sync.Once
@@ -171,16 +172,18 @@ func Start(options Options) (*Log, error) {
 	}
 	boot := fmt.Sprintf("%d-%d", time.Now().Unix(), os.Getpid())
 	path := filepath.Join(options.Directory, fmt.Sprintf("%s-%s.jsonl", options.Role, boot))
+	debugFile := filepath.Join(options.Directory, fmt.Sprintf("%s-%s.debug.jsonl", options.Role, boot))
 	file, err := openFile(path, os.O_EXCL)
 	if err != nil {
 		return nil, err
 	}
 	log := &Log{
-		options:  options,
-		messages: make(chan message, options.QueueEvents+reservedForRequests),
-		path:     path,
-		boot:     boot,
-		done:     make(chan struct{}),
+		options:   options,
+		messages:  make(chan message, options.QueueEvents+reservedForRequests),
+		path:      path,
+		debugPath: debugFile,
+		boot:      boot,
+		done:      make(chan struct{}),
 	}
 	open := log.openEvent()
 	// The default policy is in force until a policy file says otherwise, and it is the first log.policy of the run.
@@ -208,12 +211,20 @@ func openFile(path string, extra int) (*os.File, error) {
 	return os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY|syscall.O_CLOEXEC|extra, 0o600)
 }
 
-// Path is the file of this run.
+// Path is the main file of this run (error, warn and info).
 func (l *Log) Path() string {
 	if l == nil {
 		return ""
 	}
 	return l.path
+}
+
+// DebugPath is the debug file of this run (debug and trace), which exists once its first line was written.
+func (l *Log) DebugPath() string {
+	if l == nil {
+		return ""
+	}
+	return l.debugPath
 }
 
 // monotonicNanos reads the monotonic clock of the records. A clock that cannot be read is a defect of the platform: it is
@@ -472,8 +483,8 @@ func (l *Log) dropped(lost loss) *pendingEvent {
 // rotateFiles moves the full file to generation 1 and the older generations one step up, removes the generation beyond the
 // kept ones, and opens a new file. It returns the new file and the name of the removed generation (empty when none was
 // removed).
-func (l *Log) rotateFiles(file *os.File) (*os.File, string, error) {
-	generation := func(n int) string { return fmt.Sprintf("%s.%d", l.path, n) }
+func (l *Log) rotateFiles(path string, file *os.File) (*os.File, string, error) {
+	generation := func(n int) string { return fmt.Sprintf("%s.%d", path, n) }
 	removed := ""
 	if err := os.Remove(generation(l.options.Generations)); err == nil {
 		removed = filepath.Base(generation(l.options.Generations))
@@ -485,13 +496,13 @@ func (l *Log) rotateFiles(file *os.File) (*os.File, string, error) {
 			return nil, "", fmt.Errorf("rotation could not move %s: %v", generation(n), err)
 		}
 	}
-	if err := os.Rename(l.path, generation(1)); err != nil {
-		return nil, "", fmt.Errorf("rotation could not move %s: %v", l.path, err)
+	if err := os.Rename(path, generation(1)); err != nil {
+		return nil, "", fmt.Errorf("rotation could not move %s: %v", path, err)
 	}
 	// The new file is opened before the old one is closed, so a failure leaves the writer with a file to write.
-	next, err := openFile(l.path, 0)
+	next, err := openFile(path, 0)
 	if err != nil {
-		return nil, "", fmt.Errorf("rotation could not open %s: %v", l.path, err)
+		return nil, "", fmt.Errorf("rotation could not open %s: %v", path, err)
 	}
 	if err := file.Close(); err != nil {
 		fmt.Fprintf(os.Stderr, "event writer: rotation could not close the full file: %v\n", err)
@@ -499,37 +510,49 @@ func (l *Log) rotateFiles(file *os.File) (*os.File, string, error) {
 	return next, removed, nil
 }
 
-// run is the writer goroutine: it takes the messages in order, assigns seq and writes the batches.
+// channelFile is one file of the writer: the main file of the levels error, warn and info, or the debug file of the levels
+// debug and trace (docs/spec/logging.md#files). The debug file is created when its first line is written.
+type channelFile struct {
+	path string
+	file *os.File
+	// batch holds the lines that wait for the next write, batchLines their number and batchFirst the seq of the first.
+	batch      []byte
+	batchLines uint64
+	batchFirst uint64
+	// batchDrop is the range named by the log.dropped line in the batch.
+	batchDrop *loss
+	// size is the number of bytes of the file, written or waiting in the batch.
+	size int64
+	// onDisk is whether the file holds its log.open line; inBatchOpen is whether the batch holds it.
+	onDisk, inBatchOpen bool
+	// pending is the range that the next line must name, after a batch that the disk refused.
+	pending loss
+	// rotated is the note of a rotation, stored in the line after the log.open of the new file.
+	rotated *pendingEvent
+	// rotateAt is the size at which the file is rotated; a failed rotation moves it by one bound.
+	rotateAt int64
+}
+
+// run is the writer goroutine: it takes the messages in order, assigns seq and writes the batches. The levels error, warn
+// and info go to the main file and the levels debug and trace to the debug file, with one seq across both.
 func (l *Log) run(file *os.File, first *pendingEvent) {
 	defer close(l.done)
+	otherChannel := &channelFile{path: l.path, file: file, rotateAt: l.options.RotateBytes}
+	debugChannel := &channelFile{path: l.debugPath, rotateAt: l.options.RotateBytes}
 	defer func() {
-		if err := file.Close(); err != nil {
-			fmt.Fprintf(os.Stderr, "event writer: %v\n", err)
+		for _, channel := range []*channelFile{otherChannel, debugChannel} {
+			if channel.file != nil {
+				if err := channel.file.Close(); err != nil {
+					fmt.Fprintf(os.Stderr, "event writer: %v\n", err)
+				}
+			}
 		}
 	}()
-	var (
-		seq uint64
-		// batch holds the lines that wait for the next write, batchLines their number and batchFirst the seq of the first.
-		batch      []byte
-		batchLines uint64
-		batchFirst uint64
-		// batchDrop is the range named by the log.dropped line in the batch.
-		batchDrop *loss
-		// size is the number of bytes of the current file, written or waiting in the batch.
-		size int64
-		// onDisk is whether the current file holds its log.open line; inBatchOpen is whether the batch holds it.
-		onDisk, inBatchOpen bool
-		// pending is the range that the next line must name, after a batch that the disk refused.
-		pending loss
-		// rotated is the note of a rotation, stored in the line after the log.open of the new file.
-		rotated *pendingEvent
-		// rotateAt is the size at which the file is rotated; a failed rotation moves it by one bound.
-		rotateAt = l.options.RotateBytes
-		// heldEvents and heldBytes are the events of the queue that the batch holds; the queue is charged for them until the
-		// batch is written, so the batch is bounded like the queue.
-		heldEvents, heldBytes int64
-	)
-	appendLine := func(e *pendingEvent) {
+	var seq uint64
+	// heldEvents and heldBytes are the events of the queue that the batches hold; the queue is charged for them until they
+	// are written, so the batches are bounded like the queue.
+	var heldEvents, heldBytes int64
+	appendLine := func(f *channelFile, e *pendingEvent) {
 		seq++
 		line, err := eventLine(seq, e)
 		if err != nil {
@@ -537,17 +560,17 @@ func (l *Log) run(file *os.File, first *pendingEvent) {
 			fmt.Fprintf(os.Stderr, "event writer: %s cannot be written: %v\n", e.event, err)
 			return
 		}
-		if batchLines == 0 {
-			batchFirst = seq
+		if f.batchLines == 0 {
+			f.batchFirst = seq
 		}
-		batchLines++
-		batch = append(batch, line...)
-		size += int64(len(line))
+		f.batchLines++
+		f.batch = append(f.batch, line...)
+		f.size += int64(len(line))
 	}
 	// begin stores the lines that a file needs before the next event: its log.open (with the note of the rotation that made
 	// the file) and the log.dropped of a batch that the disk refused.
-	begin := func() {
-		if !onDisk && !inBatchOpen {
+	begin := func(f *channelFile) {
+		if !f.onDisk && !f.inBatchOpen {
 			open := first
 			if open == nil {
 				open = l.openEvent()
@@ -558,80 +581,94 @@ func (l *Log) run(file *os.File, first *pendingEvent) {
 			if first != nil {
 				policies = l.takePolicyEvents()
 			}
-			first = nil
-			appendLine(open)
-			inBatchOpen = true
-			for _, e := range policies {
-				appendLine(e)
+			if f == otherChannel {
+				first = nil
 			}
-			if rotated != nil {
-				appendLine(rotated)
-				rotated = nil
+			appendLine(f, open)
+			f.inBatchOpen = true
+			for _, e := range policies {
+				appendLine(f, e)
+			}
+			if f.rotated != nil {
+				appendLine(f, f.rotated)
+				f.rotated = nil
 			}
 		}
-		if pending.count > 0 {
-			lost := pending
-			pending = loss{}
-			batchDrop = &lost
-			appendLine(l.dropped(lost))
+		if f.pending.count > 0 {
+			lost := f.pending
+			f.pending = loss{}
+			f.batchDrop = &lost
+			appendLine(f, l.dropped(lost))
 		}
 	}
-	flush := func() {
-		begin()
-		l.queuedEvents.Add(-heldEvents)
-		l.queuedBytes.Add(-heldBytes)
-		heldEvents, heldBytes = 0, 0
-		if len(batch) == 0 {
+	flush := func(f *channelFile) {
+		// A file with no line to write opens with its first line: begin would write the log.open of a file that no event of
+		// its channel reached, and the debug file would hold an open line without a writer.
+		if len(f.batch) == 0 {
 			return
 		}
+		begin(f)
 		// A failed write is reported on the standard error and counted: the lines of the batch have seq that the file does
 		// not hold, so the next lines name their range in a log.dropped.
-		if err := l.options.Write(file, batch); err != nil {
+		if err := l.options.Write(f.file, f.batch); err != nil {
 			fmt.Fprintf(os.Stderr, "event writer: %v\n", err)
-			lost := loss{from: batchFirst, to: seq, count: batchLines, bytes: uint64(len(batch)), reason: "the write failed: " + err.Error()}
-			if batchDrop != nil {
-				lost.from = min(lost.from, batchDrop.from)
-				lost.count += batchDrop.count - 1
-				lost.bytes += batchDrop.bytes
+			lost := loss{from: f.batchFirst, to: seq, count: f.batchLines, bytes: uint64(len(f.batch)), reason: "the write failed: " + err.Error()}
+			if f.batchDrop != nil {
+				lost.from = min(lost.from, f.batchDrop.from)
+				lost.count += f.batchDrop.count - 1
+				lost.bytes += f.batchDrop.bytes
 			}
-			pending = lost
-			size -= int64(len(batch))
-		} else if inBatchOpen {
-			onDisk = true
+			f.pending = lost
+			f.size -= int64(len(f.batch))
+		} else if f.inBatchOpen {
+			f.onDisk = true
 		}
-		inBatchOpen = false
-		batch = batch[:0]
-		batchLines = 0
-		batchDrop = nil
+		f.inBatchOpen = false
+		f.batch = f.batch[:0]
+		f.batchLines = 0
+		f.batchDrop = nil
 	}
 	// push stores an event. A file that this line would take past the bound is closed first; the new file opens with log.open
 	// and the record of the rotation, so every file of the contract starts with log.open and seq continues.
 	push := func(e *pendingEvent) {
-		begin()
+		f := otherChannel
+		if e.level == LevelDebug || e.level == LevelTrace {
+			f = debugChannel
+		}
+		begin(f)
 		line, err := eventLine(seq+1, e)
-		if err == nil && size > 0 && size+int64(len(line)) > rotateAt {
-			full := size
-			flush()
-			next, removed, rotateErr := l.rotateFiles(file)
+		if err == nil && f.size > 0 && f.size+int64(len(line)) > f.rotateAt {
+			full := f.size
+			flush(f)
+			next, removed, rotateErr := l.rotateFiles(f.path, f.file)
 			if rotateErr != nil {
 				// A failed rotation leaves the full file in use; the next try is one bound later, so the failure is
 				// reported once for each bound instead of for each event.
 				fmt.Fprintf(os.Stderr, "event writer: %v\n", rotateErr)
-				rotateAt = size + l.options.RotateBytes
+				f.rotateAt = f.size + l.options.RotateBytes
 			} else {
-				file = next
-				size, onDisk, rotateAt = 0, false, l.options.RotateBytes
+				f.file = next
+				f.size, f.onDisk, f.rotateAt = 0, false, l.options.RotateBytes
 				name := "null"
 				if removed != "" {
 					name = fmt.Sprintf("%q", removed)
 				}
-				rotated = &pendingEvent{tsMicros: time.Now().UnixMicro(), monoNs: l.monotonicNanos(), level: LevelInfo, event: "log.rotated",
+				f.rotated = &pendingEvent{tsMicros: time.Now().UnixMicro(), monoNs: l.monotonicNanos(), level: LevelInfo, event: "log.rotated",
 					fields: json.RawMessage(fmt.Sprintf(`{"bytes":%d,"kept":%d,"removed":%s}`, full, l.options.Generations, name))}
-				l.classify(rotated)
-				begin()
+				l.classify(f.rotated)
+				begin(f)
 			}
 		}
-		appendLine(e)
+		// The debug file is created with its first line of its channel.
+		if f.file == nil {
+			opened, openErr := openFile(f.path, os.O_EXCL)
+			if openErr != nil {
+				fmt.Fprintf(os.Stderr, "event writer: the debug file could not be created: %v\n", openErr)
+				return
+			}
+			f.file = opened
+		}
+		appendLine(f, e)
 	}
 	// recordLoss stores one log.dropped after the range of seq that the refused events would have had. The refused events
 	// had no seq. Their numbers are skipped, and log.dropped is stored after the range that it names
@@ -640,7 +677,6 @@ func (l *Log) run(file *os.File, first *pendingEvent) {
 		if events == 0 {
 			return
 		}
-		begin()
 		from := seq + 1
 		seq += events
 		push(l.dropped(loss{from: from, to: seq, count: events, bytes: bytes, reason: reason}))
@@ -661,7 +697,8 @@ func (l *Log) run(file *os.File, first *pendingEvent) {
 	write := func() {
 		recordLoss()
 		recordPolicy()
-		flush()
+		flush(otherChannel)
+		flush(debugChannel)
 	}
 	take := func(e *pendingEvent) {
 		heldEvents++
