@@ -4,7 +4,7 @@
 
 ## Unreleased
 
-- F1: the event catalog names the sidecar `files` and declares the `log.*` events in the form of the base, which the composed catalog of core requires; the writer still stores no class.
+- F1: the event catalog names the sidecar `files` and declares the `log.*` events in the form of the base, and the writer stores the class of every line, an event outside the catalog as undeclared, and the channel other on log.dropped.
 - S18.5.2: the sidecar reads `log-policy.json` in the parent folder of `--log-dir` when it starts and watches it through the file system events of the platform: a creation, a write, a replacement and a rename put its policy in force, a removal restores the default policy, an empty file waits, and a refused file is reported once as `error: log policy: <text>`. The inotify watch of a regular file reports writes.
 - S18.5.1: the writer reads the policy by the rules of core (`events.ParsePolicy`), gates each event of the catalog by its class and level before its fields are built, and stores `log.policy` (first policy and each change) and `log.gated` (exact counts of the events the gate did not build); `tests/fixtures/policy/cases.json` is the copy of the golden cases that core owns.
 - S18.4: `events.json` declares the events of the sidecar and `sidecar.json` names it in `events`; `make test` runs the census and the catalog check of `soksak-events` with `census.json`; `@soksak/plugin-api` resolves from a core commit that has the command.

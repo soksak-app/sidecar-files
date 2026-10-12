@@ -14,6 +14,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	catalog "github.com/soksak-app/sidecar-files"
 	"unicode/utf8"
 
 	"github.com/soksak-app/sidecar-files/src/events"
@@ -21,15 +23,17 @@ import (
 
 // loggedEvent is one line of an event file.
 type loggedEvent struct {
-	TsMicros  int64          `json:"ts_us"`
-	MonoNs    uint64         `json:"mono_ns"`
-	Seq       uint64         `json:"seq"`
-	Level     string         `json:"level"`
-	Layer     string         `json:"layer"`
-	Event     string         `json:"event"`
-	Cids      []string       `json:"cids"`
-	Fields    map[string]any `json:"fields"`
-	Truncated int            `json:"truncated"`
+	TsMicros   int64          `json:"ts_us"`
+	MonoNs     uint64         `json:"mono_ns"`
+	Seq        uint64         `json:"seq"`
+	Level      string         `json:"level"`
+	Layer      string         `json:"layer"`
+	Event      string         `json:"event"`
+	Class      string         `json:"class"`
+	Undeclared bool           `json:"undeclared"`
+	Cids       []string       `json:"cids"`
+	Fields     map[string]any `json:"fields"`
+	Truncated  int            `json:"truncated"`
 }
 
 // keysOf returns the keys of a JSON object in the order they are written.
@@ -100,6 +104,12 @@ func clock(start uint64) func() (uint64, error) {
 func startLog(t *testing.T, change func(*events.Options)) *events.Log {
 	t.Helper()
 	options := events.DefaultOptions(filepath.Join(t.TempDir(), "logs"), "files", clock(9_000_000_000))
+	// The writer of the sidecar always starts with the classes of its catalog, so the tests do too.
+	classes, err := events.ClassesOfCatalog(catalog.Events)
+	if err != nil {
+		t.Fatal(err)
+	}
+	options.Classes = classes
 	if change != nil {
 		change(&options)
 	}
@@ -145,6 +155,31 @@ func TestTheFileOpensWithLogOpenAndTheNameFollowsTheContract(t *testing.T) {
 	}
 	if lines[1].Seq != 2 || lines[1].Layer != "sidecar" {
 		t.Fatalf("event %+v", lines[1])
+	}
+}
+
+// contract: log.event.class-follows-the-catalog
+func TestEveryLineCarriesTheClassThatTheCatalogDeclares(t *testing.T) {
+	log := startLog(t, func(options *events.Options) {
+		classes, err := events.ClassesOfCatalog(catalog.Events)
+		if err != nil {
+			t.Fatal(err)
+		}
+		options.Classes = classes
+		if classes["sidecar.files.start"] != events.ClassLifecycle {
+			t.Fatalf("the catalog gives sidecar.files.start the class %q", classes["sidecar.files.start"])
+		}
+	})
+	log.EmitHost(events.LevelInfo, "sidecar.files.start", map[string]any{"pid": 1, "platform": "x"})
+	log.EmitHost(events.LevelInfo, "an.unknown.event", map[string]any{})
+	lines := finish(t, log)
+	for _, at := range []int{0, 1, 2} {
+		if lines[at].Class != "lifecycle" {
+			t.Fatalf("%s carries %q", lines[at].Event, lines[at].Class)
+		}
+	}
+	if lines[3].Undeclared != true || lines[3].Class != "" {
+		t.Fatalf("an event outside the catalog carries class %q and undeclared %v", lines[3].Class, lines[3].Undeclared)
 	}
 }
 

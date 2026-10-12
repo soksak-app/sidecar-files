@@ -244,7 +244,9 @@ func (l *Log) ApplyPolicy(policy Policy, source string) {
 		fmt.Fprintf(os.Stderr, "event writer: log.policy cannot be serialized: %v\n", err)
 		return
 	}
-	l.policyEvents = append(l.policyEvents, &pendingEvent{tsMicros: time.Now().UnixMicro(), monoNs: l.monotonicNanos(), level: LevelInfo, event: "log.policy", fields: text})
+	reported := &pendingEvent{tsMicros: time.Now().UnixMicro(), monoNs: l.monotonicNanos(), level: LevelInfo, event: "log.policy", fields: text}
+	l.classify(reported)
+	l.policyEvents = append(l.policyEvents, reported)
 }
 
 // takePolicyEvents returns the log.policy events that wait for the writer.
@@ -299,7 +301,9 @@ func (l *Log) takeGated() []gatedCount {
 // gatedEvent is the log.gated event of one count.
 func (l *Log) gatedEvent(count gatedCount) *pendingEvent {
 	fields := fmt.Sprintf(`{"class":%q,"level":%q,"count":%d}`, string(count.class), string(count.level), count.count)
-	return &pendingEvent{tsMicros: time.Now().UnixMicro(), monoNs: l.monotonicNanos(), level: LevelInfo, event: "log.gated", fields: json.RawMessage(fields)}
+	gated := &pendingEvent{tsMicros: time.Now().UnixMicro(), monoNs: l.monotonicNanos(), level: LevelInfo, event: "log.gated", fields: json.RawMessage(fields)}
+	l.classify(gated)
+	return gated
 }
 
 // gate reports whether the event is stored. An event that the catalog does not declare has no class and no gate.

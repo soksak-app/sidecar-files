@@ -96,7 +96,11 @@ type pendingEvent struct {
 	monoNs   uint64
 	level    Level
 	event    string
-	cids     []string
+	// class is the class that the catalog declares for the event; it is empty, and undeclared is set, for a name the catalog
+	// does not declare (docs/spec/logging.md#event).
+	class      Class
+	undeclared bool
+	cids       []string
 	// fields is the fields as JSON text, serialized once by the producer.
 	fields json.RawMessage
 	bytes  int
@@ -227,7 +231,9 @@ func (l *Log) monotonicNanos() uint64 {
 // openEvent is the log.open event of a file: the schema number, the process identifier, the role and the boot.
 func (l *Log) openEvent() *pendingEvent {
 	fields := fmt.Sprintf(`{"schema":%d,"pid":%d,"role":%q,"boot":%q}`, Schema, os.Getpid(), l.options.Role, l.boot)
-	return &pendingEvent{tsMicros: time.Now().UnixMicro(), monoNs: l.monotonicNanos(), level: LevelInfo, event: "log.open", fields: json.RawMessage(fields)}
+	open := &pendingEvent{tsMicros: time.Now().UnixMicro(), monoNs: l.monotonicNanos(), level: LevelInfo, event: "log.open", fields: json.RawMessage(fields)}
+	l.classify(open)
+	return open
 }
 
 // checkCids refuses a list of correlation identifiers that the line of an event cannot carry: an identifier is not empty and
@@ -306,6 +312,7 @@ func (l *Log) emit(level Level, event string, cids []string, fields any) bool {
 		return false
 	}
 	pending := &pendingEvent{tsMicros: time.Now().UnixMicro(), monoNs: l.monotonicNanos(), level: level, event: event, cids: cids, fields: text, bytes: bytes, truncated: truncated}
+	l.classify(pending)
 	l.queuedBytes.Add(int64(bytes))
 	l.queuedEvents.Add(1)
 	select {
@@ -372,6 +379,15 @@ func (l *Log) refuse(bytes int) {
 	l.refusedBytes.Add(uint64(bytes))
 }
 
+// classify gives the event the class that the catalog declares for its name. A name the catalog does not declare is stored
+// without a class and marked undeclared (docs/spec/logging.md#event).
+func (l *Log) classify(e *pendingEvent) {
+	e.class, e.undeclared = l.options.Classes[e.event], false
+	if e.class == "" {
+		e.undeclared = true
+	}
+}
+
 // Flush writes everything that is queued and waits until it is on disk, at most deadline.
 func (l *Log) Flush(deadline time.Duration) error {
 	if l == nil {
@@ -419,16 +435,19 @@ type eventRecord struct {
 	MonoNs   uint64          `json:"mono_ns"`
 	Seq      uint64          `json:"seq"`
 	Level    Level           `json:"level"`
+	Class    Class           `json:"class,omitempty"`
 	Layer    string          `json:"layer"`
 	Event    string          `json:"event"`
 	Cids     []string        `json:"cids,omitempty"`
 	Fields   json.RawMessage `json:"fields"`
+	// Undeclared is true for an event whose name the catalog does not declare; such a line has no class.
+	Undeclared bool `json:"undeclared,omitempty"`
 	// Truncated is the size in bytes of the fields before they were cut; it is absent for an event that was not cut.
 	Truncated int `json:"truncated,omitempty"`
 }
 
 func eventLine(seq uint64, e *pendingEvent) ([]byte, error) {
-	line, err := json.Marshal(eventRecord{TsMicros: e.tsMicros, MonoNs: e.monoNs, Seq: seq, Level: e.level, Layer: layer, Event: e.event, Cids: e.cids, Fields: e.fields, Truncated: e.truncated})
+	line, err := json.Marshal(eventRecord{TsMicros: e.tsMicros, MonoNs: e.monoNs, Seq: seq, Level: e.level, Class: e.class, Layer: layer, Event: e.event, Cids: e.cids, Fields: e.fields, Undeclared: e.undeclared, Truncated: e.truncated})
 	if err != nil {
 		return nil, err
 	}
@@ -441,10 +460,13 @@ type loss struct {
 	reason                 string
 }
 
-// dropped is the log.dropped event that names the range.
+// dropped is the log.dropped event that names the range. The sidecar holds one event file, so the channel of every lost
+// event is other (docs/spec/logging.md#files).
 func (l *Log) dropped(lost loss) *pendingEvent {
-	fields := fmt.Sprintf(`{"from_seq":%d,"to_seq":%d,"count":%d,"bytes":%d,"reason":%q}`, lost.from, lost.to, lost.count, lost.bytes, lost.reason)
-	return &pendingEvent{tsMicros: time.Now().UnixMicro(), monoNs: l.monotonicNanos(), level: LevelWarn, event: "log.dropped", fields: json.RawMessage(fields)}
+	fields := fmt.Sprintf(`{"from_seq":%d,"to_seq":%d,"count":%d,"bytes":%d,"reason":%q,"channel":"other"}`, lost.from, lost.to, lost.count, lost.bytes, lost.reason)
+	dropped := &pendingEvent{tsMicros: time.Now().UnixMicro(), monoNs: l.monotonicNanos(), level: LevelWarn, event: "log.dropped", fields: json.RawMessage(fields)}
+	l.classify(dropped)
+	return dropped
 }
 
 // rotateFiles moves the full file to generation 1 and the older generations one step up, removes the generation beyond the
@@ -605,6 +627,7 @@ func (l *Log) run(file *os.File, first *pendingEvent) {
 				}
 				rotated = &pendingEvent{tsMicros: time.Now().UnixMicro(), monoNs: l.monotonicNanos(), level: LevelInfo, event: "log.rotated",
 					fields: json.RawMessage(fmt.Sprintf(`{"bytes":%d,"kept":%d,"removed":%s}`, full, l.options.Generations, name))}
+				l.classify(rotated)
 				begin()
 			}
 		}
