@@ -4,6 +4,7 @@
 
 ## 미배포
 
+- S21: `make hooks`가 `.githooks`를 hook 폴더로 정해, commit message의 형식이나 용어 규칙, record 규칙을 어긴 commit이 만들어질 때 거부된다.
 - S20: `make test`가 record 검사 `soksak-records`를 실행하고, CI가 push된 각 commit message의 형식을 `soksak-commits`로 검사한다.
 - S19: `@soksak/plugin-api`를 commit 대신 core release tag `v0.0.11`에서 받고, release workflow가 그 release에서 `sok`를 build한다.
 - S18.5.2: 사이드카가 시작할 때 `--log-dir`의 부모 폴더의 `log-policy.json`을 읽고 플랫폼의 파일 시스템 event로 감시한다. 생성, 쓰기, 교체, 이름 변경은 그 정책을 적용하고, 삭제는 기본 정책을 되살리며, 빈 파일은 기다리고, 거부된 파일은 `error: log policy: <글>`로 한 번 보고한다. 정규 파일에 대한 inotify 감시가 쓰기를 알린다.

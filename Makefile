@@ -1,5 +1,5 @@
 # files sidecar repository 의 test, build, release(docs/features.md). release 는 core 의 sok 를 쓴다.
-.PHONY: test build release
+.PHONY: test build release hooks
 
 GO_FLAGS ?=
 SOK ?= sok
@@ -22,3 +22,7 @@ build:
 release: build
 	@test -n "$(OUT)" || { echo "make release OUT=<folder>" >&2; exit 2; }
 	$(SOK) sidecar release . $(OUT)
+
+# Sets this repository to use .githooks, which checks commit messages and records at commit time.
+hooks:
+	@git config core.hooksPath .githooks

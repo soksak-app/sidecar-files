@@ -8,6 +8,7 @@
 make test                 # tests
 make build                # the executable that sidecar.json names
 make release OUT=<folder> SOK=<core>/target/debug/sok   # the release for this platform
+make hooks                # once after cloning: check commit messages and records at commit time
 ```
 
 The checklist is [docs/features.md](docs/features.md).

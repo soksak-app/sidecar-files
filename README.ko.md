@@ -8,6 +8,7 @@
 make test                 # test
 make build                # sidecar.json이 가리키는 실행 파일
 make release OUT=<folder> SOK=<core>/target/debug/sok   # 이 platform의 release
+make hooks                # clone 후 한 번: commit 때 commit message와 record를 검사
 ```
 
 Checklist는 [docs/features.md](docs/features.md)다.
