@@ -12,6 +12,9 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The commit message check reads every commit of the pushed range.
+          fetch-depth: 0
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -21,6 +24,9 @@ jobs:
       - uses: pnpm/action-setup@v4
       - name: Test
         run: make test
+      - name: Commit messages
+        if: github.event_name == 'pull_request' || github.event.before != '0000000000000000000000000000000000000000'
+        run: pnpm exec soksak-commits ${{ github.event_name == 'pull_request' && format('{0}..{1}', github.event.pull_request.base.sha, github.event.pull_request.head.sha) || format('{0}..{1}', github.event.before, github.sha) }}
 
   # 디렉터리 감시는 Linux 에서 inotify 를 쓴다(docs/features.md S8). 같은 test 를 Linux runner 에서도 실행한다.
   test-linux:

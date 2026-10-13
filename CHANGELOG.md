@@ -4,6 +4,7 @@
 
 ## Unreleased
 
+- S20: `make test` runs the record check `soksak-records`, and CI checks the form of each pushed commit message with `soksak-commits`.
 - S19: `@soksak/plugin-api` comes from the core release tag `v0.0.11` instead of a commit, and the release workflow builds `sok` from that release.
 - F1: the event catalog names the sidecar `files` and declares the `log.*` events in the form of the base, and the writer stores the class of every line, an event outside the catalog as undeclared, and the channel other on log.dropped.
 - F2: the writer stores debug and trace in `files-<boot>.debug.jsonl`, which it creates with the first line of its channel; one seq counts across both files and each rotates by its generations.

@@ -13,6 +13,7 @@ test: node_modules
 	go test ./...
 	node --test tests/
 	node_modules/.bin/soksak-events --census census.json --catalog events.json
+	node_modules/.bin/soksak-records
 
 # sidecar.json 이 가리키는 build/soksak-files 를 쓴다.
 build:
