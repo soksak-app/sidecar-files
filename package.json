@@ -16,6 +16,6 @@
     "build/soksak-files"
   ],
   "devDependencies": {
-    "@soksak/plugin-api": "git+https://github.com/soksak-app/core.git#57534e3873295ac5bd0fae8e0bc4271ae30e5e5c&path:/packages/plugin-api"
+    "@soksak/plugin-api": "git+https://github.com/soksak-app/core.git#v0.0.11&path:/packages/plugin-api"
   }
 }

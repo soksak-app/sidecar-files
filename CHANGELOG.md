@@ -4,6 +4,7 @@
 
 ## Unreleased
 
+- S19: `@soksak/plugin-api` comes from the core release tag `v0.0.11` instead of a commit, and the release workflow builds `sok` from that release.
 - F1: the event catalog names the sidecar `files` and declares the `log.*` events in the form of the base, and the writer stores the class of every line, an event outside the catalog as undeclared, and the channel other on log.dropped.
 - F2: the writer stores debug and trace in `files-<boot>.debug.jsonl`, which it creates with the first line of its channel; one seq counts across both files and each rotates by its generations.
 - S18.5.2: the sidecar reads `log-policy.json` in the parent folder of `--log-dir` when it starts and watches it through the file system events of the platform: a creation, a write, a replacement and a rename put its policy in force, a removal restores the default policy, an empty file waits, and a refused file is reported once as `error: log policy: <text>`. The inotify watch of a regular file reports writes.
