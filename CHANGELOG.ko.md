@@ -4,6 +4,7 @@
 
 ## 미배포
 
+- S23: 기본 정책은 모든 class에서 `error`만 저장하며, 첫 정책 전과 `log-policy.json`이 없는 동안 적용된다. 그러므로 `warn`, `info`, `debug`, `trace` event는 거부된다. 골든 사례 `tests/fixtures/policy/cases.json`은 core에서 복사했다.
 - S21: `make hooks`가 `.githooks`를 hook 폴더로 정해, commit message의 형식이나 용어 규칙, record 규칙을 어긴 commit이 만들어질 때 거부된다.
 - S20: `make test`가 record 검사 `soksak-records`를 실행하고, CI가 push된 각 commit message의 형식을 `soksak-commits`로 검사한다.
 - S19: `@soksak/plugin-api`를 commit 대신 core release tag `v0.0.11`에서 받고, release workflow가 그 release에서 `sok`를 build한다.

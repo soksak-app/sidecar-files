@@ -48,17 +48,18 @@ func levelRank(value string) int {
 	return -1
 }
 
-// Policy is the least severe level that is stored for each class. The zero value stores nothing; DefaultPolicy stores every
-// level of every class.
+// Policy is the least severe level that is stored for each class. The zero value stores nothing; DefaultPolicy stores the
+// errors of every class.
 type Policy struct {
 	ranks [5]int
 }
 
-// DefaultPolicy is the policy in force while there is no policy file: every class at `trace`.
+// DefaultPolicy is the policy in force before the first policy and while there is no policy file: every class at `error`
+// (docs/spec/logging.md#policy).
 func DefaultPolicy() Policy {
 	var policy Policy
 	for i := range policy.ranks {
-		policy.ranks[i] = levelRank("trace")
+		policy.ranks[i] = levelRank("error")
 	}
 	return policy
 }

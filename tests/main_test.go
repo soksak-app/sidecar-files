@@ -92,7 +92,9 @@ func find(lines []loggedEvent, event string) *loggedEvent {
 
 // contract: log.sidecar.failure-ends-with-an-error-event
 func TestAFailureThatEndsTheSidecarIsAnErrorEventAndAnExit(t *testing.T) {
-	folder := filepath.Join(t.TempDir(), "logs")
+	config := t.TempDir()
+	replace(t, filepath.Join(config, "log-policy.json"), policyText(nil))
+	folder := filepath.Join(config, "logs")
 	stderr, status := runSidecar(t, "not json\n", "--log-dir", folder)
 	if status != 1 || !strings.Contains(stderr, "invalid request") {
 		t.Fatalf("status %d, standard error %q", status, stderr)
@@ -109,7 +111,9 @@ func TestAFailureThatEndsTheSidecarIsAnErrorEventAndAnExit(t *testing.T) {
 
 // contract: log.sidecar.exit-states-the-status
 func TestACleanEndStatesStatusZero(t *testing.T) {
-	folder := filepath.Join(t.TempDir(), "logs")
+	config := t.TempDir()
+	replace(t, filepath.Join(config, "log-policy.json"), policyText(nil))
+	folder := filepath.Join(config, "logs")
 	if stderr, status := runSidecar(t, "", "--log-dir", folder); status != 0 || stderr != "" {
 		t.Fatalf("status %d, standard error %q", status, stderr)
 	}

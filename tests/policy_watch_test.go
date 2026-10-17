@@ -176,7 +176,7 @@ func TestACreatedFileChangesThePolicyAndItsRemovalRestoresTheDefault(t *testing.
 		t.Fatal(err)
 	}
 	lines = await(t, log, "the default policy after the removal", func(lines []loggedEvent) bool { return len(policies(lines)) == 3 })
-	if sourcesOf(lines) != "default,file,default" || !log.Enabled("io", "debug") || !log.Enabled("frame", "trace") {
+	if sourcesOf(lines) != "default,file,default" || !log.Enabled("io", "error") || log.Enabled("io", "debug") || log.Enabled("frame", "trace") {
 		t.Fatalf("log.policy events %+v", policies(lines))
 	}
 }
@@ -234,7 +234,7 @@ func TestAnEmptyFileWaitsAndABadFileIsRefusedOnceAndTheEarlierPolicyStays(t *tes
 func TestABadFileAtStartLeavesTheDefaultPolicyAndIsReported(t *testing.T) {
 	log, file, report, _ := watchedLog(t, `{"schema":2,"classes":{}}`)
 	lines := finish(t, log)
-	if sourcesOf(lines) != "default" || !log.Enabled("io", "trace") {
+	if sourcesOf(lines) != "default" || log.Enabled("io", "warn") || !log.Enabled("io", "error") {
 		t.Fatalf("log.policy events %+v", policies(lines))
 	}
 	if want := "error: log policy: " + file + ": schema 2 is not 1\n"; report.String() != want {
@@ -244,7 +244,7 @@ func TestABadFileAtStartLeavesTheDefaultPolicyAndIsReported(t *testing.T) {
 
 // contract: log.policy.watch-needs-a-file
 func TestAWatchWithoutAPolicyFileIsRefused(t *testing.T) {
-	log := startLog(t, nil)
+	log := startLogWithDefaultPolicy(t, nil)
 	current, err := platform.Current()
 	if err != nil {
 		t.Fatal(err)

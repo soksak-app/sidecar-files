@@ -18,8 +18,9 @@ import (
 
 type policyCases struct {
 	File    string   `json:"file"`
-	Classes []string `json:"classes"`
-	Values  []string `json:"values"`
+	Classes []string          `json:"classes"`
+	Default map[string]string `json:"default"`
+	Values  []string          `json:"values"`
 	Valid   []struct {
 		Name    string            `json:"name"`
 		Text    string            `json:"text"`
@@ -116,15 +117,47 @@ func TestThePolicyReaderGivesTheResultOfEveryGoldenCase(t *testing.T) {
 	}
 }
 
-// contract: log.policy.default-stores-every-level
-func TestTheDefaultPolicyStoresEveryLevelOfEveryClass(t *testing.T) {
+// contract: log.policy.default-stores-only-errors
+func TestTheDefaultPolicyStoresOnlyErrorsOfEveryClass(t *testing.T) {
 	cases := loadPolicyCases(t)
 	policy := events.DefaultPolicy()
 	for _, class := range cases.Classes {
-		for _, level := range []string{"error", "warn", "info", "debug", "trace"} {
-			if !policy.Allows(events.Class(class), events.Level(level)) {
-				t.Fatalf("the default policy refuses %s %s", class, level)
+		if got := policy.Level(events.Class(class)); got != cases.Default[class] {
+			t.Fatalf("the default policy holds %s at %q, want %q", class, got, cases.Default[class])
+		}
+		if !policy.Allows(events.Class(class), events.LevelError) {
+			t.Fatalf("the default policy refuses %s error", class)
+		}
+		for _, level := range []events.Level{events.LevelWarn, events.LevelInfo, events.LevelDebug, events.LevelTrace} {
+			if policy.Allows(events.Class(class), level) {
+				t.Fatalf("the default policy stores %s %s", class, level)
 			}
+		}
+	}
+}
+
+// contract: log.policy.default-without-a-file
+func TestWithoutAPolicyFileOnlyErrorsAreStoredOfEveryClass(t *testing.T) {
+	cases := loadPolicyCases(t)
+	log := startGatedLog(t)
+	for _, class := range cases.Classes {
+		if !log.Enabled(events.Class(class), events.LevelError) {
+			t.Fatalf("the writer without a policy file refuses %s error", class)
+		}
+		for _, level := range []events.Level{events.LevelWarn, events.LevelInfo, events.LevelDebug, events.LevelTrace} {
+			if log.Enabled(events.Class(class), level) {
+				t.Fatalf("the writer without a policy file stores %s %s", class, level)
+			}
+		}
+	}
+	policies := eventsNamed(finish(t, log), "log.policy")
+	if len(policies) != 1 || policies[0].Fields["source"] != "default" {
+		t.Fatalf("log.policy events %+v, want the default policy once", policies)
+	}
+	classes, _ := policies[0].Fields["classes"].(map[string]any)
+	for _, class := range cases.Classes {
+		if classes[class] != cases.Default[class] {
+			t.Fatalf("log.policy holds %s at %v, want %q", class, classes[class], cases.Default[class])
 		}
 	}
 }
@@ -162,7 +195,7 @@ func mustPolicy(t *testing.T, levels map[string]string) events.Policy {
 func startGatedLog(t *testing.T) *events.Log {
 	t.Helper()
 	classes := catalogClasses(t)
-	return startLog(t, func(options *events.Options) { options.Classes = classes })
+	return startLogWithDefaultPolicy(t, func(options *events.Options) { options.Classes = classes })
 }
 
 // contract: log.policy.change-is-an-event

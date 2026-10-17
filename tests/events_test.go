@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -101,10 +102,33 @@ func clock(start uint64) func() (uint64, error) {
 	return func() (uint64, error) { return now.Add(1000), nil }
 }
 
-// startLog starts a writer with the bounds of the contract in a disposable folder.
+// startLog starts a writer with the bounds of the contract in a disposable folder. The policy file of its configuration folder
+// stores every level of every class, so a test that is not about the policy sees each event that it emits; the default policy
+// is started by startLogWithDefaultPolicy.
 func startLog(t *testing.T, change func(*events.Options)) *events.Log {
 	t.Helper()
-	options := events.DefaultOptions(filepath.Join(t.TempDir(), "logs"), "files", clock(9_000_000_000))
+	config := t.TempDir()
+	file := filepath.Join(config, "log-policy.json")
+	replace(t, file, policyText(nil))
+	return startLogWithOptions(t, filepath.Join(config, "logs"), func(options *events.Options) {
+		options.PolicyFile = file
+		// The file holds a valid policy, so the writer reports nothing to this report.
+		options.PolicyReport = io.Discard
+		if change != nil {
+			change(options)
+		}
+	})
+}
+
+// startLogWithDefaultPolicy starts a writer without a policy file, so the default policy is in force.
+func startLogWithDefaultPolicy(t *testing.T, change func(*events.Options)) *events.Log {
+	t.Helper()
+	return startLogWithOptions(t, filepath.Join(t.TempDir(), "logs"), change)
+}
+
+func startLogWithOptions(t *testing.T, folder string, change func(*events.Options)) *events.Log {
+	t.Helper()
+	options := events.DefaultOptions(folder, "files", clock(9_000_000_000))
 	// The writer of the sidecar always starts with the classes of its catalog, so the tests do too.
 	classes, err := events.ClassesOfCatalog(catalog.Events)
 	if err != nil {
