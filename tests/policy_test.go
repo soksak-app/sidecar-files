@@ -17,7 +17,7 @@ import (
 )
 
 type policyCases struct {
-	File    string   `json:"file"`
+	File    string            `json:"file"`
 	Classes []string          `json:"classes"`
 	Default map[string]string `json:"default"`
 	Values  []string          `json:"values"`
