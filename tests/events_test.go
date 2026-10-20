@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -482,6 +483,112 @@ func TestTheQueueAcceptsEventsAgainAfterTheWriterWritesThem(t *testing.T) {
 		if !log.EmitHost(events.LevelInfo, "sidecar.files.start", map[string]any{"i": i}) {
 			t.Fatalf("event %d was refused after the writer wrote the queue", i)
 		}
+	}
+}
+
+// A loss of the levels debug and trace carries the channel debug, and the record is stored in the main file.
+func TestALossOfTheDebugChannelIsLabelledDebug(t *testing.T) {
+	log := startLog(t, func(options *events.Options) { options.QueueEvents = 4; options.BatchInterval = time.Hour })
+	for i := 0; i < 4; i++ {
+		if !log.EmitHost(events.LevelDebug, "sidecar.files.watch_change", map[string]any{"i": i}) {
+			t.Fatalf("event %d was refused although the queue has room for it", i)
+		}
+	}
+	if log.EmitHost(events.LevelDebug, "sidecar.files.watch_change", map[string]any{"i": 4}) {
+		t.Fatal("an event over the queue bound was accepted")
+	}
+	if err := log.Flush(5 * time.Second); err != nil {
+		t.Fatal(err)
+	}
+	var dropped []loggedEvent
+	for _, line := range readEvents(t, log.Path()) {
+		if line.Event == "log.dropped" {
+			dropped = append(dropped, line)
+		}
+	}
+	if len(dropped) != 1 || dropped[0].Fields["channel"] != "debug" || dropped[0].Fields["count"] != float64(1) {
+		t.Fatalf("the main file holds log.dropped %+v, want one of the channel debug with count 1", dropped)
+	}
+}
+
+// Losses are recorded once for each channel and reason; each record names its channel and is stored in the main file.
+func TestLossesAreRecordedOncePerChannelAndReason(t *testing.T) {
+	log := startLog(t, func(options *events.Options) { options.QueueEvents = 4; options.BatchInterval = time.Hour })
+	// The queue is empty here, so these two events pass the queue bound and are refused as invalid.
+	if log.EmitHost(events.LevelDebug, "sidecar.files.watch_change", make(chan int)) {
+		t.Fatal("a debug event with fields that cannot be serialized was accepted")
+	}
+	if log.EmitHost(events.LevelInfo, "sidecar.files.start", make(chan int)) {
+		t.Fatal("an info event with fields that cannot be serialized was accepted")
+	}
+	for i := 0; i < 4; i++ {
+		if !log.EmitHost(events.LevelInfo, "sidecar.files.start", map[string]any{"i": i}) {
+			t.Fatalf("event %d was refused although the queue has room for it", i)
+		}
+	}
+	if log.EmitHost(events.LevelInfo, "sidecar.files.start", map[string]any{"i": 4}) {
+		t.Fatal("an info event over the queue bound was accepted")
+	}
+	if log.EmitHost(events.LevelDebug, "sidecar.files.watch_change", map[string]any{"i": 4}) {
+		t.Fatal("a debug event over the queue bound was accepted")
+	}
+	if err := log.Flush(5 * time.Second); err != nil {
+		t.Fatal(err)
+	}
+	counts := map[string]float64{}
+	for _, line := range readEvents(t, log.Path()) {
+		if line.Event != "log.dropped" {
+			continue
+		}
+		key := fmt.Sprintf("%v/%v", line.Fields["channel"], line.Fields["reason"])
+		counts[key] += line.Fields["count"].(float64)
+		if line.Fields["reason"] == "the queue was full" && line.Fields["queued"] != float64(4) {
+			t.Fatalf("log.dropped %+v states queued %v, want 4", line.Fields, line.Fields["queued"])
+		}
+	}
+	want := map[string]float64{
+		"other/the queue was full":               1,
+		"debug/the queue was full":               1,
+		"other/the event was refused as invalid": 1,
+		"debug/the event was refused as invalid": 1,
+	}
+	if !maps.Equal(counts, want) {
+		t.Fatalf("log.dropped counts by channel and reason = %v, want %v", counts, want)
+	}
+}
+
+// A failed write of the debug file is recorded in the main file with the channel debug.
+func TestAFailedDebugWriteIsRecordedInTheMainFile(t *testing.T) {
+	var failures atomic.Int32
+	log := startLog(t, func(options *events.Options) {
+		options.Write = func(file *os.File, data []byte) error {
+			if strings.HasSuffix(file.Name(), ".debug.jsonl") && failures.Add(-1) >= 0 {
+				return fmt.Errorf("write failed on purpose")
+			}
+			_, err := file.Write(data)
+			return err
+		}
+	})
+	failures.Store(1)
+	log.EmitHost(events.LevelDebug, "sidecar.files.watch_change", map[string]any{"i": 1})
+	if err := log.Flush(5 * time.Second); err != nil {
+		t.Fatal(err)
+	}
+	log.EmitHost(events.LevelDebug, "sidecar.files.watch_change", map[string]any{"i": 2})
+	if err := log.Flush(5 * time.Second); err != nil {
+		t.Fatal(err)
+	}
+	var dropped []loggedEvent
+	for _, line := range readEvents(t, log.Path()) {
+		if line.Event == "log.dropped" {
+			dropped = append(dropped, line)
+		}
+	}
+	if len(dropped) != 1 || dropped[0].Fields["channel"] != "debug" {
+		t.Fatalf("the main file holds log.dropped %+v, want one of the channel debug", dropped)
+	}
+	if reason, _ := dropped[0].Fields["reason"].(string); !strings.Contains(reason, "write failed on purpose") {
+		t.Fatalf("reason %q", reason)
 	}
 }
 

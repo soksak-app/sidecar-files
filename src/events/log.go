@@ -106,6 +106,8 @@ type pendingEvent struct {
 	bytes  int
 	// truncated is the size in bytes of the fields text before it was cut to its head, and 0 for an event that was not cut.
 	truncated int
+	// drop is the range of a log.dropped event; a batch that holds the event counts the range with it.
+	drop *loss
 }
 
 // message is what the queue carries: an event, or a request of the owner. Two slots of the queue are reserved for requests,
@@ -122,20 +124,41 @@ const ExitDeadline = 2 * time.Second
 // reservedForRequests is the number of slots of the queue that only requests use.
 const reservedForRequests = 2
 
+// The channels of a loss: other holds the levels error, warn and info, and debug holds the levels debug and trace
+// (docs/spec/logging.md#files).
+const (
+	channelOther = iota
+	channelDebug
+	channelCount
+)
+
+// channelNames are the names of the channels in log.dropped.
+var channelNames = [channelCount]string{"other", "debug"}
+
+// The reasons of a loss: the queue was full, or the caller gave an invalid value.
+const (
+	reasonFull = iota
+	reasonRefused
+	reasonCount
+)
+
+// reasonTexts are the reasons of the loss records.
+var reasonTexts = [reasonCount]string{"the queue was full", "the event was refused as invalid"}
+
+// lossCount is the number of events and bytes that one channel and reason lost, and the largest queue depth at those refusals.
+// The writer resets it when it records the loss.
+type lossCount struct {
+	events, bytes, depth atomic.Uint64
+}
+
 // Log is the writer of one run of the sidecar. A nil *Log accepts no event.
 type Log struct {
-	options       Options
-	messages      chan message
-	queuedEvents  atomic.Int64
-	queuedBytes   atomic.Int64
-	lostEvents    atomic.Uint64
-	lostBytes     atomic.Uint64
-	refusedEvents atomic.Uint64
-	refusedBytes  atomic.Uint64
-	// lostDepth and refusedDepth are the largest queue depths at the refusals that the next log.dropped of each count takes
-	// (docs/spec/logging.md#writers); the writer resets each one when it records its count.
-	lostDepth    atomic.Uint64
-	refusedDepth atomic.Uint64
+	options      Options
+	messages     chan message
+	queuedEvents atomic.Int64
+	queuedBytes  atomic.Int64
+	// losses counts the refusals of each channel and reason until the writer records them (docs/spec/logging.md#writers).
+	losses       [channelCount][reasonCount]lossCount
 	closed       atomic.Bool
 	path         string
 	debugPath    string
@@ -290,7 +313,7 @@ func (l *Log) emit(level Level, event string, cids []string, fields any) bool {
 	switch level {
 	case LevelError, LevelWarn, LevelInfo, LevelDebug, LevelTrace:
 	default:
-		l.refuse(len(event))
+		l.refuse(level, len(event))
 		fmt.Fprintf(os.Stderr, "event writer: %s has the level %q, which the contract does not define\n", event, string(level))
 		return false
 	}
@@ -298,12 +321,12 @@ func (l *Log) emit(level Level, event string, cids []string, fields any) bool {
 		return false
 	}
 	if err := checkCids(cids); err != nil {
-		l.refuse(len(event))
+		l.refuse(level, len(event))
 		fmt.Fprintf(os.Stderr, "event writer: the cids of %s are refused: %v\n", event, err)
 		return false
 	}
 	if l.queuedEvents.Load() >= int64(l.options.QueueEvents) {
-		l.countLoss(len(event))
+		l.countLoss(level, len(event))
 		return false
 	}
 	// A builder runs only for an event that the policy stores.
@@ -313,7 +336,7 @@ func (l *Log) emit(level Level, event string, cids []string, fields any) bool {
 	text, err := json.Marshal(fields)
 	if err != nil {
 		// A value that cannot be serialized is a defect of the caller; it is counted in place of the event.
-		l.refuse(len(event))
+		l.refuse(level, len(event))
 		fmt.Fprintf(os.Stderr, "event writer: the fields of %s cannot be serialized: %v\n", event, err)
 		return false
 	}
@@ -323,7 +346,7 @@ func (l *Log) emit(level Level, event string, cids []string, fields any) bool {
 		bytes += len(cid)
 	}
 	if l.queuedBytes.Load()+int64(bytes) > l.options.QueueBytes {
-		l.countLoss(bytes)
+		l.countLoss(level, bytes)
 		return false
 	}
 	pending := &pendingEvent{tsMicros: time.Now().UnixMicro(), monoNs: l.monotonicNanos(), level: level, event: event, cids: cids, fields: text, bytes: bytes, truncated: truncated}
@@ -336,7 +359,7 @@ func (l *Log) emit(level Level, event string, cids []string, fields any) bool {
 	default:
 		l.queuedBytes.Add(-int64(bytes))
 		l.queuedEvents.Add(-1)
-		l.countLoss(bytes)
+		l.countLoss(level, bytes)
 		return false
 	}
 }
@@ -382,26 +405,32 @@ func ResultError(code int, text string) string {
 	return cut
 }
 
-// countLoss counts an event that the queue refused because it was full.
-func (l *Log) countLoss(bytes int) {
-	l.lostEvents.Add(1)
-	l.lostBytes.Add(uint64(bytes))
-	l.raiseDepth(&l.lostDepth)
+// channelOf is the channel of the events of a level; a level the contract does not define is counted in other.
+func channelOf(level Level) int {
+	if level == LevelDebug || level == LevelTrace {
+		return channelDebug
+	}
+	return channelOther
 }
 
-// refuse counts an event that the writer refused because the caller gave it an invalid value.
-func (l *Log) refuse(bytes int) {
-	l.refusedEvents.Add(1)
-	l.refusedBytes.Add(uint64(bytes))
-	l.raiseDepth(&l.refusedDepth)
+// countLoss counts an event of the level that the queue refused because it was full.
+func (l *Log) countLoss(level Level, bytes int) {
+	l.count(&l.losses[channelOf(level)][reasonFull], bytes)
 }
 
-// raiseDepth keeps the largest queue depth that a refusal saw since the writer last recorded the refusals of the depth.
-func (l *Log) raiseDepth(depth *atomic.Uint64) {
+// refuse counts an event of the level that the writer refused because the caller gave it an invalid value.
+func (l *Log) refuse(level Level, bytes int) {
+	l.count(&l.losses[channelOf(level)][reasonRefused], bytes)
+}
+
+// count adds one event of bytes to a loss and keeps the largest queue depth at its refusals.
+func (l *Log) count(loss *lossCount, bytes int) {
+	loss.events.Add(1)
+	loss.bytes.Add(uint64(bytes))
 	queued := uint64(l.queuedEvents.Load())
 	for {
-		current := depth.Load()
-		if queued <= current || depth.CompareAndSwap(current, queued) {
+		current := loss.depth.Load()
+		if queued <= current || loss.depth.CompareAndSwap(current, queued) {
 			return
 		}
 	}
@@ -483,17 +512,17 @@ func eventLine(seq uint64, e *pendingEvent) ([]byte, error) {
 }
 
 // loss is a range of seq that no line of the file holds, with the events and the bytes it stands for. queued is the largest
-// queue depth at the refusals that the range counts; a write that failed refused no event, so its queued is 0.
+// queue depth at the refusals that the range counts; a write that failed refused no event, so its queued is 0. channel is
+// the channel of the lost events.
 type loss struct {
 	from, to, count, bytes, queued uint64
-	reason                         string
+	channel, reason                string
 }
 
-// dropped is the log.dropped event that names the range. The sidecar holds one event file, so the channel of every lost
-// event is other (docs/spec/logging.md#files).
+// dropped is the log.dropped event that names the range. It is stored in the main file (docs/spec/logging.md#writers).
 func (l *Log) dropped(lost loss) *pendingEvent {
-	fields := fmt.Sprintf(`{"from_seq":%d,"to_seq":%d,"count":%d,"bytes":%d,"reason":%q,"channel":"other","queued":%d}`, lost.from, lost.to, lost.count, lost.bytes, lost.reason, lost.queued)
-	dropped := &pendingEvent{tsMicros: time.Now().UnixMicro(), monoNs: l.monotonicNanos(), level: LevelWarn, event: "log.dropped", fields: json.RawMessage(fields)}
+	fields := fmt.Sprintf(`{"from_seq":%d,"to_seq":%d,"count":%d,"bytes":%d,"reason":%q,"channel":%q,"queued":%d}`, lost.from, lost.to, lost.count, lost.bytes, lost.reason, lost.channel, lost.queued)
+	dropped := &pendingEvent{tsMicros: time.Now().UnixMicro(), monoNs: l.monotonicNanos(), level: LevelWarn, event: "log.dropped", fields: json.RawMessage(fields), drop: &lost}
 	l.classify(dropped)
 	return dropped
 }
@@ -531,19 +560,21 @@ func (l *Log) rotateFiles(path string, file *os.File) (*os.File, string, error) 
 // channelFile is one file of the writer: the main file of the levels error, warn and info, or the debug file of the levels
 // debug and trace (docs/spec/logging.md#files). The debug file is created when its first line is written.
 type channelFile struct {
+	// name is the channel of the lines of the file, which names the loss of a write of the file.
+	name string
 	path string
 	file *os.File
 	// batch holds the lines that wait for the next write, batchLines their number and batchFirst the seq of the first.
 	batch      []byte
 	batchLines uint64
 	batchFirst uint64
-	// batchDrop is the range named by the log.dropped line in the batch.
-	batchDrop *loss
+	// batchDrops are the ranges of the log.dropped lines in the batch, which a failed write of the batch loses with its lines.
+	batchDrops []loss
 	// size is the number of bytes of the file, written or waiting in the batch.
 	size int64
 	// onDisk is whether the file holds its log.open line; inBatchOpen is whether the batch holds it.
 	onDisk, inBatchOpen bool
-	// pending is the range that the next line must name, after a batch that the disk refused.
+	// pending is the range that a write refused; its log.dropped is stored in the main file with the next batch of the file.
 	pending loss
 	// rotated is the note of a rotation, stored in the line after the log.open of the new file.
 	rotated *pendingEvent
@@ -552,11 +583,12 @@ type channelFile struct {
 }
 
 // run is the writer goroutine: it takes the messages in order, assigns seq and writes the batches. The levels error, warn
-// and info go to the main file and the levels debug and trace to the debug file, with one seq across both.
+// and info go to the main file and the levels debug and trace to the debug file, with one seq across both. Every log.dropped
+// is stored in the main file.
 func (l *Log) run(file *os.File, first *pendingEvent) {
 	defer close(l.done)
-	otherChannel := &channelFile{path: l.path, file: file, rotateAt: l.options.RotateBytes}
-	debugChannel := &channelFile{path: l.debugPath, rotateAt: l.options.RotateBytes}
+	otherChannel := &channelFile{name: channelNames[channelOther], path: l.path, file: file, rotateAt: l.options.RotateBytes}
+	debugChannel := &channelFile{name: channelNames[channelDebug], path: l.debugPath, rotateAt: l.options.RotateBytes}
 	defer func() {
 		for _, channel := range []*channelFile{otherChannel, debugChannel} {
 			if channel.file != nil {
@@ -584,10 +616,14 @@ func (l *Log) run(file *os.File, first *pendingEvent) {
 		f.batchLines++
 		f.batch = append(f.batch, line...)
 		f.size += int64(len(line))
+		if e.drop != nil {
+			f.batchDrops = append(f.batchDrops, *e.drop)
+		}
 	}
-	// begin stores the lines that a file needs before the next event: its log.open (with the note of the rotation that made
-	// the file) and the log.dropped of a batch that the disk refused.
-	begin := func(f *channelFile) {
+	// begin stores the log.open of a file that has none in its batch, with the note of the rotation that made the file. Then it
+	// stores the log.dropped of a write that the disk refused, in the main file.
+	var begin func(f *channelFile)
+	begin = func(f *channelFile) {
 		if !f.onDisk && !f.inBatchOpen {
 			open := first
 			if open == nil {
@@ -612,11 +648,12 @@ func (l *Log) run(file *os.File, first *pendingEvent) {
 				f.rotated = nil
 			}
 		}
+		// A write that the disk refused left a range that no line holds. Its log.dropped goes to the main file.
 		if f.pending.count > 0 {
 			lost := f.pending
 			f.pending = loss{}
-			f.batchDrop = &lost
-			appendLine(f, l.dropped(lost))
+			begin(otherChannel)
+			appendLine(otherChannel, l.dropped(lost))
 		}
 	}
 	flush := func(f *channelFile) {
@@ -630,11 +667,12 @@ func (l *Log) run(file *os.File, first *pendingEvent) {
 		// not hold, so the next lines name their range in a log.dropped.
 		if err := l.options.Write(f.file, f.batch); err != nil {
 			fmt.Fprintf(os.Stderr, "event writer: %v\n", err)
-			lost := loss{from: f.batchFirst, to: seq, count: f.batchLines, bytes: uint64(len(f.batch)), reason: "the write failed: " + err.Error()}
-			if f.batchDrop != nil {
-				lost.from = min(lost.from, f.batchDrop.from)
-				lost.count += f.batchDrop.count - 1
-				lost.bytes += f.batchDrop.bytes
+			lost := loss{from: f.batchFirst, to: seq, count: f.batchLines, bytes: uint64(len(f.batch)), channel: f.name, reason: "the write failed: " + err.Error()}
+			// The log.dropped lines of the batch are lost with it: each adds the events it named in place of its own line.
+			for _, drop := range f.batchDrops {
+				lost.from = min(lost.from, drop.from)
+				lost.count += drop.count - 1
+				lost.bytes += drop.bytes
 			}
 			f.pending = lost
 			f.size -= int64(len(f.batch))
@@ -644,7 +682,7 @@ func (l *Log) run(file *os.File, first *pendingEvent) {
 		f.inBatchOpen = false
 		f.batch = f.batch[:0]
 		f.batchLines = 0
-		f.batchDrop = nil
+		f.batchDrops = nil
 	}
 	// push stores an event. A file that this line would take past the bound is closed first; the new file opens with log.open
 	// and the record of the rotation, so every file of the contract starts with log.open and seq continues.
@@ -688,20 +726,22 @@ func (l *Log) run(file *os.File, first *pendingEvent) {
 		}
 		appendLine(f, e)
 	}
-	// recordLoss stores one log.dropped after the range of seq that the refused events would have had. The refused events
-	// had no seq. Their numbers are skipped, and log.dropped is stored after the range that it names
-	// (docs/spec/logging.md#event).
-	record := func(events, bytes, queued uint64, reason string) {
-		if events == 0 {
-			return
-		}
-		from := seq + 1
-		seq += events
-		push(l.dropped(loss{from: from, to: seq, count: events, bytes: bytes, queued: queued, reason: reason}))
-	}
+	// recordLoss stores one log.dropped for each channel and reason that lost events, each after the range of seq that its
+	// refused events would have had. The refused events had no seq. Their numbers are skipped, and log.dropped is stored after
+	// the range that it names (docs/spec/logging.md#event).
 	recordLoss := func() {
-		record(l.lostEvents.Swap(0), l.lostBytes.Swap(0), l.lostDepth.Swap(0), "the queue was full")
-		record(l.refusedEvents.Swap(0), l.refusedBytes.Swap(0), l.refusedDepth.Swap(0), "the event was refused as invalid")
+		for channel := range channelCount {
+			for reason := range reasonCount {
+				counted := &l.losses[channel][reason]
+				events, bytes, queued := counted.events.Swap(0), counted.bytes.Swap(0), counted.depth.Swap(0)
+				if events == 0 {
+					continue
+				}
+				from := seq + 1
+				seq += events
+				push(l.dropped(loss{from: from, to: seq, count: events, bytes: bytes, queued: queued, channel: channelNames[channel], reason: reasonTexts[reason]}))
+			}
+		}
 	}
 	// recordPolicy stores the log.policy events and the counts of log.gated. They are events of the writer and pass every gate.
 	recordPolicy := func() {
@@ -715,8 +755,10 @@ func (l *Log) run(file *os.File, first *pendingEvent) {
 	write := func() {
 		recordLoss()
 		recordPolicy()
-		flush(otherChannel)
+		// The debug file is flushed first: a write of it that the disk refuses stores its log.dropped in the main file, which
+		// the main file then writes.
 		flush(debugChannel)
+		flush(otherChannel)
 		// Every event that the batches held is written or counted as lost now, so the queue is no longer charged for it.
 		l.queuedEvents.Add(-heldEvents)
 		l.queuedBytes.Add(-heldBytes)

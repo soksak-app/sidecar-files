@@ -4,6 +4,8 @@
 
 ## 미배포
 
+- S27: loss를 channel과 reason별로 센다. 각 `log.dropped`는 channel(error, warn, info는 `other`, debug와 trace는 `debug`)을 담고 main file에 저장된다. debug file의 write 실패도 channel debug로 기록된다.
+
 - S28: writer가 쓰거나 loss로 센 event마다 queue 점유를 해제해, writer가 쓴 뒤 queue가 다시 event를 받아들인다. 이전에는 process 수명 동안 처음 한도 뒤의 모든 event를 거부했다.
 
 - S26: `log.dropped`가 `queued`를 선언하고 기록한다. `queued`는 기록이 세는 거부 시점의 queue 최대 깊이이며, `events.json`은 core와 같이 선언한다. `tests/fixtures/log-contract/base-dropped.json`은 core 카탈로그에서 복사했다.

@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+- S27: Losses are counted per channel and reason; each `log.dropped` names its channel (`other` for error, warn and info, `debug` for debug and trace) and is stored in the main file. A failed write of the debug file is recorded with the channel debug.
+
 - S28: The writer releases the queue charge of each event it writes or counts as lost, so the queue accepts events again after the writer writes them; before, the queue refused every event after its first bound of events for the life of the process.
 
 - S26: `log.dropped` declares and writes `queued`, the largest queue depth at the refusals that the record counts, and `events.json` declares it as core does; `tests/fixtures/log-contract/base-dropped.json` is copied from the core catalog.
