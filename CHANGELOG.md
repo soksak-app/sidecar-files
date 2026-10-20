@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+- S28: The writer releases the queue charge of each event it writes or counts as lost, so the queue accepts events again after the writer writes them; before, the queue refused every event after its first bound of events for the life of the process.
+
 - S26: `log.dropped` declares and writes `queued`, the largest queue depth at the refusals that the record counts, and `events.json` declares it as core does; `tests/fixtures/log-contract/base-dropped.json` is copied from the core catalog.
 
 - S25: new commits are authored as `min-0-max <max@blue.tools>`; `.mailmap` maps the former name `min-median-max`, and published commits are not rewritten.

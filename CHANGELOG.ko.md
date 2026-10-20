@@ -4,6 +4,8 @@
 
 ## 미배포
 
+- S28: writer가 쓰거나 loss로 센 event마다 queue 점유를 해제해, writer가 쓴 뒤 queue가 다시 event를 받아들인다. 이전에는 process 수명 동안 처음 한도 뒤의 모든 event를 거부했다.
+
 - S26: `log.dropped`가 `queued`를 선언하고 기록한다. `queued`는 기록이 세는 거부 시점의 queue 최대 깊이이며, `events.json`은 core와 같이 선언한다. `tests/fixtures/log-contract/base-dropped.json`은 core 카탈로그에서 복사했다.
 
 - S25: 새 커밋의 작성자는 `min-0-max <max@blue.tools>`다. `.mailmap`이 이전 이름 `min-median-max`를 잇고, 게시된 커밋은 다시 쓰지 않는다.

@@ -467,6 +467,24 @@ func TestALossRecordCarriesTheQueueDepthOfItsRefusals(t *testing.T) {
 	}
 }
 
+// Events that the writer has written no longer wait in the queue, so the queue accepts events again.
+func TestTheQueueAcceptsEventsAgainAfterTheWriterWritesThem(t *testing.T) {
+	log := startLog(t, func(options *events.Options) { options.QueueEvents = 4; options.BatchInterval = time.Hour })
+	for i := 0; i < 4; i++ {
+		if !log.EmitHost(events.LevelInfo, "sidecar.files.start", map[string]any{"i": i}) {
+			t.Fatalf("event %d was refused although the queue has room for it", i)
+		}
+	}
+	if err := log.Flush(5 * time.Second); err != nil {
+		t.Fatal(err)
+	}
+	for i := 4; i < 8; i++ {
+		if !log.EmitHost(events.LevelInfo, "sidecar.files.start", map[string]any{"i": i}) {
+			t.Fatalf("event %d was refused after the writer wrote the queue", i)
+		}
+	}
+}
+
 // contract: log.writer.never-blocks-and-counts-loss
 func TestAFullQueueRefusesWithoutBlockingAndEveryEventIsStoredOrCounted(t *testing.T) {
 	log := startLog(t, func(options *events.Options) { options.QueueEvents = 4; options.BatchInterval = time.Hour })

@@ -717,6 +717,10 @@ func (l *Log) run(file *os.File, first *pendingEvent) {
 		recordPolicy()
 		flush(otherChannel)
 		flush(debugChannel)
+		// Every event that the batches held is written or counted as lost now, so the queue is no longer charged for it.
+		l.queuedEvents.Add(-heldEvents)
+		l.queuedBytes.Add(-heldBytes)
+		heldEvents, heldBytes = 0, 0
 	}
 	take := func(e *pendingEvent) {
 		heldEvents++
