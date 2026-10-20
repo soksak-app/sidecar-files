@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+- S29: A failed write keeps each loss that its batch holds. Each `log.dropped` line of the batch is recorded again with its own channel and reason, and the other lines are recorded as the failed write, one record for each run of consecutive seq. Before, a failed main-file batch that held a debug loss merged the losses into one record of the channel `other`.
+
 - S27: Losses are counted per channel and reason; each `log.dropped` names its channel (`other` for error, warn and info, `debug` for debug and trace) and is stored in the main file. A failed write of the debug file is recorded with the channel debug.
 
 - S28: The writer releases the queue charge of each event it writes or counts as lost, so the queue accepts events again after the writer writes them; before, the queue refused every event after its first bound of events for the life of the process.

@@ -4,6 +4,8 @@
 
 ## 미배포
 
+- S29: 실패한 쓰기는 batch가 담은 loss를 모두 유지한다. batch의 각 `log.dropped` 줄은 자기 channel과 reason으로 다시 기록하고, 나머지 줄은 연속된 seq의 run마다 실패한 쓰기의 기록 하나로 남긴다. 이전에는 debug loss를 담은 main file의 실패한 batch가 loss를 channel `other`의 기록 하나로 합쳤다.
+
 - S27: loss를 channel과 reason별로 센다. 각 `log.dropped`는 channel(error, warn, info는 `other`, debug와 trace는 `debug`)을 담고 main file에 저장된다. debug file의 write 실패도 channel debug로 기록된다.
 
 - S28: writer가 쓰거나 loss로 센 event마다 queue 점유를 해제해, writer가 쓴 뒤 queue가 다시 event를 받아들인다. 이전에는 process 수명 동안 처음 한도 뒤의 모든 event를 거부했다.

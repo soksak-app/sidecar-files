@@ -557,6 +557,40 @@ func (l *Log) rotateFiles(path string, file *os.File) (*os.File, string, error) 
 	return next, removed, nil
 }
 
+// batchItem is one line of a batch: its seq, its size in bytes, and for a log.dropped line the loss that it names.
+type batchItem struct {
+	seq, bytes uint64
+	drop       *loss
+}
+
+// lostOf returns the loss records of a batch that a write refused. Each log.dropped line of the batch keeps its own loss, with
+// its channel and reason. The other lines form one record for each run of consecutive seq, with the reason of the failed
+// write. A run ends at the seq of a line that does not follow the previous line, because the seq of the refused events that a
+// log.dropped line names lies before that line and holds no line of the batch.
+func lostOf(f *channelFile, reason string) []loss {
+	var lost []loss
+	var run *loss
+	for _, item := range f.items {
+		if item.drop != nil {
+			lost = append(lost, *item.drop)
+		}
+		if run != nil && item.seq == run.to+1 {
+			run.to = item.seq
+			run.count++
+			run.bytes += item.bytes
+			continue
+		}
+		if run != nil {
+			lost = append(lost, *run)
+		}
+		run = &loss{from: item.seq, to: item.seq, count: 1, bytes: item.bytes, channel: f.name, reason: reason}
+	}
+	if run != nil {
+		lost = append(lost, *run)
+	}
+	return lost
+}
+
 // channelFile is one file of the writer: the main file of the levels error, warn and info, or the debug file of the levels
 // debug and trace (docs/spec/logging.md#files). The debug file is created when its first line is written.
 type channelFile struct {
@@ -564,18 +598,16 @@ type channelFile struct {
 	name string
 	path string
 	file *os.File
-	// batch holds the lines that wait for the next write, batchLines their number and batchFirst the seq of the first.
-	batch      []byte
-	batchLines uint64
-	batchFirst uint64
-	// batchDrops are the ranges of the log.dropped lines in the batch, which a failed write of the batch loses with its lines.
-	batchDrops []loss
+	// batch holds the lines that wait for the next write, and items describes each of them in the order of the batch.
+	batch []byte
+	items []batchItem
 	// size is the number of bytes of the file, written or waiting in the batch.
 	size int64
 	// onDisk is whether the file holds its log.open line; inBatchOpen is whether the batch holds it.
 	onDisk, inBatchOpen bool
-	// pending is the range that a write refused; its log.dropped is stored in the main file with the next batch of the file.
-	pending loss
+	// pending are the loss records of a write that the disk refused; they are stored in the main file with the next batch of
+	// the main file.
+	pending []loss
 	// rotated is the note of a rotation, stored in the line after the log.open of the new file.
 	rotated *pendingEvent
 	// rotateAt is the size at which the file is rotated; a failed rotation moves it by one bound.
@@ -610,15 +642,9 @@ func (l *Log) run(file *os.File, first *pendingEvent) {
 			fmt.Fprintf(os.Stderr, "event writer: %s cannot be written: %v\n", e.event, err)
 			return
 		}
-		if f.batchLines == 0 {
-			f.batchFirst = seq
-		}
-		f.batchLines++
 		f.batch = append(f.batch, line...)
+		f.items = append(f.items, batchItem{seq: seq, bytes: uint64(len(line)), drop: e.drop})
 		f.size += int64(len(line))
-		if e.drop != nil {
-			f.batchDrops = append(f.batchDrops, *e.drop)
-		}
 	}
 	// begin stores the log.open of a file that has none in its batch, with the note of the rotation that made the file. Then it
 	// stores the log.dropped of a write that the disk refused, in the main file.
@@ -648,12 +674,14 @@ func (l *Log) run(file *os.File, first *pendingEvent) {
 				f.rotated = nil
 			}
 		}
-		// A write that the disk refused left a range that no line holds. Its log.dropped goes to the main file.
-		if f.pending.count > 0 {
+		// A write that the disk refused left the ranges that no line holds. Their log.dropped lines go to the main file.
+		if len(f.pending) > 0 {
 			lost := f.pending
-			f.pending = loss{}
-			begin(otherChannel)
-			appendLine(otherChannel, l.dropped(lost))
+			f.pending = nil
+			for _, record := range lost {
+				begin(otherChannel)
+				appendLine(otherChannel, l.dropped(record))
+			}
 		}
 	}
 	flush := func(f *channelFile) {
@@ -667,22 +695,14 @@ func (l *Log) run(file *os.File, first *pendingEvent) {
 		// not hold, so the next lines name their range in a log.dropped.
 		if err := l.options.Write(f.file, f.batch); err != nil {
 			fmt.Fprintf(os.Stderr, "event writer: %v\n", err)
-			lost := loss{from: f.batchFirst, to: seq, count: f.batchLines, bytes: uint64(len(f.batch)), channel: f.name, reason: "the write failed: " + err.Error()}
-			// The log.dropped lines of the batch are lost with it: each adds the events it named in place of its own line.
-			for _, drop := range f.batchDrops {
-				lost.from = min(lost.from, drop.from)
-				lost.count += drop.count - 1
-				lost.bytes += drop.bytes
-			}
-			f.pending = lost
+			f.pending = append(f.pending, lostOf(f, "the write failed: "+err.Error())...)
 			f.size -= int64(len(f.batch))
 		} else if f.inBatchOpen {
 			f.onDisk = true
 		}
 		f.inBatchOpen = false
 		f.batch = f.batch[:0]
-		f.batchLines = 0
-		f.batchDrops = nil
+		f.items = f.items[:0]
 	}
 	// push stores an event. A file that this line would take past the bound is closed first; the new file opens with log.open
 	// and the record of the rotation, so every file of the contract starts with log.open and seq continues.

@@ -592,6 +592,68 @@ func TestAFailedDebugWriteIsRecordedInTheMainFile(t *testing.T) {
 	}
 }
 
+// A failed write of the main file keeps the loss that each log.dropped line of its batch holds with that line's channel and
+// reason, and every seq of the file is either stored or named by exactly one log.dropped.
+func TestAFailedMainBatchKeepsTheChannelAndReasonOfEachLoss(t *testing.T) {
+	var failures atomic.Int32
+	log := startLog(t, func(options *events.Options) {
+		options.QueueEvents = 4
+		options.BatchInterval = time.Hour
+		options.Write = func(file *os.File, data []byte) error {
+			if !strings.HasSuffix(file.Name(), ".debug.jsonl") && failures.Add(-1) >= 0 {
+				return fmt.Errorf("write failed on purpose")
+			}
+			_, err := file.Write(data)
+			return err
+		}
+	})
+	for i := 0; i < 4; i++ {
+		log.EmitHost(events.LevelInfo, "sidecar.files.start", map[string]any{"i": i})
+	}
+	// The queue is full, so these two events are refused: one of the channel debug and one of the channel other.
+	if log.EmitHost(events.LevelDebug, "sidecar.files.watch_change", map[string]any{"i": 4}) {
+		t.Fatal("a debug event over the queue bound was accepted")
+	}
+	if log.EmitHost(events.LevelInfo, "sidecar.files.start", map[string]any{"i": 5}) {
+		t.Fatal("an info event over the queue bound was accepted")
+	}
+	// The main batch holds the four events and the two log.dropped lines of the refusals, and its write fails.
+	failures.Store(1)
+	if err := log.Flush(5 * time.Second); err != nil {
+		t.Fatal(err)
+	}
+	log.EmitHost(events.LevelInfo, "sidecar.files.start", map[string]any{"i": 6})
+	lines := finish(t, log)
+	stored := map[uint64]bool{}
+	for _, line := range lines {
+		stored[line.Seq] = true
+	}
+	named := map[uint64]int{}
+	refusals := map[string]float64{}
+	for _, line := range lines {
+		if line.Event != "log.dropped" {
+			continue
+		}
+		from, to := uint64(line.Fields["from_seq"].(float64)), uint64(line.Fields["to_seq"].(float64))
+		for seq := from; seq <= to; seq++ {
+			named[seq]++
+		}
+		if line.Fields["reason"] == "the queue was full" {
+			refusals[fmt.Sprintf("%v/%v", line.Fields["channel"], line.Fields["reason"])] += line.Fields["count"].(float64)
+		}
+	}
+	last := lines[len(lines)-1].Seq
+	for seq := uint64(1); seq <= last; seq++ {
+		if stored[seq] == (named[seq] > 0) || named[seq] > 1 {
+			t.Fatalf("seq %d is stored %v and named %d times, want exactly one of the two", seq, stored[seq], named[seq])
+		}
+	}
+	want := map[string]float64{"debug/the queue was full": 1, "other/the queue was full": 1}
+	if !maps.Equal(refusals, want) {
+		t.Fatalf("the records of the queue refusals count %v, want %v", refusals, want)
+	}
+}
+
 // contract: log.writer.never-blocks-and-counts-loss
 func TestAFullQueueRefusesWithoutBlockingAndEveryEventIsStoredOrCounted(t *testing.T) {
 	log := startLog(t, func(options *events.Options) { options.QueueEvents = 4; options.BatchInterval = time.Hour })
