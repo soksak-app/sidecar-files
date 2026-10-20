@@ -132,13 +132,17 @@ type Log struct {
 	lostBytes     atomic.Uint64
 	refusedEvents atomic.Uint64
 	refusedBytes  atomic.Uint64
-	closed        atomic.Bool
-	path          string
-	debugPath     string
-	boot          string
-	done          chan struct{}
-	closeOnce     sync.Once
-	clockFailure  sync.Once
+	// lostDepth and refusedDepth are the largest queue depths at the refusals that the next log.dropped of each count takes
+	// (docs/spec/logging.md#writers); the writer resets each one when it records its count.
+	lostDepth    atomic.Uint64
+	refusedDepth atomic.Uint64
+	closed       atomic.Bool
+	path         string
+	debugPath    string
+	boot         string
+	done         chan struct{}
+	closeOnce    sync.Once
+	clockFailure sync.Once
 	// policy is the policy in force. policyApplied is whether one was applied, and policyEvents are the log.policy events that
 	// wait for the writer; policyMu guards the three. gated counts the events that the gate refused, by class and level.
 	policy        atomic.Pointer[Policy]
@@ -382,12 +386,25 @@ func ResultError(code int, text string) string {
 func (l *Log) countLoss(bytes int) {
 	l.lostEvents.Add(1)
 	l.lostBytes.Add(uint64(bytes))
+	l.raiseDepth(&l.lostDepth)
 }
 
 // refuse counts an event that the writer refused because the caller gave it an invalid value.
 func (l *Log) refuse(bytes int) {
 	l.refusedEvents.Add(1)
 	l.refusedBytes.Add(uint64(bytes))
+	l.raiseDepth(&l.refusedDepth)
+}
+
+// raiseDepth keeps the largest queue depth that a refusal saw since the writer last recorded the refusals of the depth.
+func (l *Log) raiseDepth(depth *atomic.Uint64) {
+	queued := uint64(l.queuedEvents.Load())
+	for {
+		current := depth.Load()
+		if queued <= current || depth.CompareAndSwap(current, queued) {
+			return
+		}
+	}
 }
 
 // classify gives the event the class that the catalog declares for its name. A name the catalog does not declare is stored
@@ -465,16 +482,17 @@ func eventLine(seq uint64, e *pendingEvent) ([]byte, error) {
 	return append(line, '\n'), nil
 }
 
-// loss is a range of seq that no line of the file holds, with the events and the bytes it stands for.
+// loss is a range of seq that no line of the file holds, with the events and the bytes it stands for. queued is the largest
+// queue depth at the refusals that the range counts; a write that failed refused no event, so its queued is 0.
 type loss struct {
-	from, to, count, bytes uint64
-	reason                 string
+	from, to, count, bytes, queued uint64
+	reason                         string
 }
 
 // dropped is the log.dropped event that names the range. The sidecar holds one event file, so the channel of every lost
 // event is other (docs/spec/logging.md#files).
 func (l *Log) dropped(lost loss) *pendingEvent {
-	fields := fmt.Sprintf(`{"from_seq":%d,"to_seq":%d,"count":%d,"bytes":%d,"reason":%q,"channel":"other"}`, lost.from, lost.to, lost.count, lost.bytes, lost.reason)
+	fields := fmt.Sprintf(`{"from_seq":%d,"to_seq":%d,"count":%d,"bytes":%d,"reason":%q,"channel":"other","queued":%d}`, lost.from, lost.to, lost.count, lost.bytes, lost.reason, lost.queued)
 	dropped := &pendingEvent{tsMicros: time.Now().UnixMicro(), monoNs: l.monotonicNanos(), level: LevelWarn, event: "log.dropped", fields: json.RawMessage(fields)}
 	l.classify(dropped)
 	return dropped
@@ -673,17 +691,17 @@ func (l *Log) run(file *os.File, first *pendingEvent) {
 	// recordLoss stores one log.dropped after the range of seq that the refused events would have had. The refused events
 	// had no seq. Their numbers are skipped, and log.dropped is stored after the range that it names
 	// (docs/spec/logging.md#event).
-	record := func(events, bytes uint64, reason string) {
+	record := func(events, bytes, queued uint64, reason string) {
 		if events == 0 {
 			return
 		}
 		from := seq + 1
 		seq += events
-		push(l.dropped(loss{from: from, to: seq, count: events, bytes: bytes, reason: reason}))
+		push(l.dropped(loss{from: from, to: seq, count: events, bytes: bytes, queued: queued, reason: reason}))
 	}
 	recordLoss := func() {
-		record(l.lostEvents.Swap(0), l.lostBytes.Swap(0), "the queue was full")
-		record(l.refusedEvents.Swap(0), l.refusedBytes.Swap(0), "the event was refused as invalid")
+		record(l.lostEvents.Swap(0), l.lostBytes.Swap(0), l.lostDepth.Swap(0), "the queue was full")
+		record(l.refusedEvents.Swap(0), l.refusedBytes.Swap(0), l.refusedDepth.Swap(0), "the event was refused as invalid")
 	}
 	// recordPolicy stores the log.policy events and the counts of log.gated. They are events of the writer and pass every gate.
 	recordPolicy := func() {

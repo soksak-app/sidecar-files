@@ -407,6 +407,66 @@ func TestARefusedEventIsCountedAndExplainedByLogDropped(t *testing.T) {
 	}
 }
 
+// The fields of log.dropped that the catalog declares are the fields of the core declaration in base-dropped.json.
+func TestTheLogDroppedFieldsEqualTheCoreDeclaration(t *testing.T) {
+	var catalogText struct {
+		Events map[string]struct {
+			Fields map[string]string `json:"fields"`
+		} `json:"events"`
+	}
+	if err := json.Unmarshal(catalog.Events, &catalogText); err != nil {
+		t.Fatal(err)
+	}
+	text, err := os.ReadFile(filepath.Join("fixtures", "log-contract", "base-dropped.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var golden struct {
+		Fields map[string]string `json:"fields"`
+	}
+	if err := json.Unmarshal(text, &golden); err != nil {
+		t.Fatal(err)
+	}
+	declared := catalogText.Events["log.dropped"].Fields
+	if len(declared) != len(golden.Fields) {
+		t.Fatalf("events.json declares %v for log.dropped, the core declaration is %v", declared, golden.Fields)
+	}
+	for name, kind := range golden.Fields {
+		if declared[name] != kind {
+			t.Fatalf("events.json declares %q as %q, the core declaration is %q", name, declared[name], kind)
+		}
+	}
+}
+
+// A loss record states the largest queue depth at the refusals that it counts.
+func TestALossRecordCarriesTheQueueDepthOfItsRefusals(t *testing.T) {
+	log := startLog(t, func(options *events.Options) { options.QueueEvents = 4; options.BatchInterval = time.Hour })
+	for i := 0; i < 4; i++ {
+		if !log.EmitHost(events.LevelInfo, "sidecar.files.start", map[string]any{"i": i}) {
+			t.Fatalf("event %d was refused although the queue has room for it", i)
+		}
+	}
+	if log.EmitHost(events.LevelInfo, "sidecar.files.start", map[string]any{"i": 4}) {
+		t.Fatal("an event over the queue bound was accepted")
+	}
+	lines := finish(t, log)
+	var dropped *loggedEvent
+	for at := range lines {
+		if lines[at].Event == "log.dropped" {
+			dropped = &lines[at]
+		}
+	}
+	if dropped == nil {
+		t.Fatalf("no log.dropped in %+v", lines)
+	}
+	if dropped.Fields["count"] != float64(1) || dropped.Fields["reason"] != "the queue was full" {
+		t.Fatalf("log.dropped %+v", dropped.Fields)
+	}
+	if dropped.Fields["queued"] != float64(4) {
+		t.Fatalf("log.dropped has queued %v, want the 4 events that waited in the queue", dropped.Fields["queued"])
+	}
+}
+
 // contract: log.writer.never-blocks-and-counts-loss
 func TestAFullQueueRefusesWithoutBlockingAndEveryEventIsStoredOrCounted(t *testing.T) {
 	log := startLog(t, func(options *events.Options) { options.QueueEvents = 4; options.BatchInterval = time.Hour })

@@ -1,0 +1,12 @@
+{
+  "label": "Copied from the soksak core docs/spec/events.json at the commit \"docs(features): Register the sidecar catalog releases (#F212.1-2-2-3-1)\"",
+  "fields": {
+    "from_seq": "number",
+    "to_seq": "number",
+    "count": "number",
+    "bytes": "number",
+    "reason": "string",
+    "channel": "string",
+    "queued?": "number"
+  }
+}

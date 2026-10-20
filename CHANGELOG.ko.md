@@ -4,6 +4,8 @@
 
 ## 미배포
 
+- S26: `log.dropped`가 `queued`를 선언하고 기록한다. `queued`는 기록이 세는 거부 시점의 queue 최대 깊이이며, `events.json`은 core와 같이 선언한다. `tests/fixtures/log-contract/base-dropped.json`은 core 카탈로그에서 복사했다.
+
 - S25: 새 커밋의 작성자는 `min-0-max <max@blue.tools>`다. `.mailmap`이 이전 이름 `min-median-max`를 잇고, 게시된 커밋은 다시 쓰지 않는다.
 
 - S24: version 0.0.6이 오류의 기본 정책(S23)을 릴리즈한다.

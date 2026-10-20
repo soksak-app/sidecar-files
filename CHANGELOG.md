@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+- S26: `log.dropped` declares and writes `queued`, the largest queue depth at the refusals that the record counts, and `events.json` declares it as core does; `tests/fixtures/log-contract/base-dropped.json` is copied from the core catalog.
+
 - S25: new commits are authored as `min-0-max <max@blue.tools>`; `.mailmap` maps the former name `min-median-max`, and published commits are not rewritten.
 
 - S24: version 0.0.6 releases the default policy of errors (S23).
