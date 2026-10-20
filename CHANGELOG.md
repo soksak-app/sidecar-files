@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+- S30: A failed write stores its pending loss records at the next write. Before, a loss of a failed debug write was stored only when a later debug event arrived, and a loss of a failed main write only when a later main event arrived, so a failed write followed only by Close left a range of seq neither stored nor named.
+
 - S29: A failed write keeps each loss that its batch holds. Each `log.dropped` line of the batch is recorded again with its own channel and reason, and the other lines are recorded as the failed write, one record for each run of consecutive seq. Before, a failed main-file batch that held a debug loss merged the losses into one record of the channel `other`.
 
 - S27: Losses are counted per channel and reason; each `log.dropped` names its channel (`other` for error, warn and info, `debug` for debug and trace) and is stored in the main file. A failed write of the debug file is recorded with the channel debug.

@@ -592,6 +592,85 @@ func TestAFailedDebugWriteIsRecordedInTheMainFile(t *testing.T) {
 	}
 }
 
+// A failed write of the debug file is stored in the main file at the next write, when the events after it are main events
+// and the log is closed. Every seq of the main file is either stored or named by exactly one log.dropped.
+func TestAFailedDebugWriteIsStoredInTheMainFileAtTheNextWrite(t *testing.T) {
+	var failures atomic.Int32
+	log := startLog(t, func(options *events.Options) {
+		options.BatchInterval = time.Hour
+		options.Write = func(file *os.File, data []byte) error {
+			if strings.HasSuffix(file.Name(), ".debug.jsonl") && failures.Add(-1) >= 0 {
+				return fmt.Errorf("write failed on purpose")
+			}
+			_, err := file.Write(data)
+			return err
+		}
+	})
+	failures.Store(1)
+	log.EmitHost(events.LevelDebug, "sidecar.files.watch_change", map[string]any{"i": 1})
+	if err := log.Flush(5 * time.Second); err != nil {
+		t.Fatal(err)
+	}
+	log.EmitHost(events.LevelInfo, "sidecar.files.start", map[string]any{"i": 2})
+	log.EmitHost(events.LevelInfo, "sidecar.files.start", map[string]any{"i": 3})
+	log.Close()
+	lines := readEvents(t, log.Path())
+	stored := map[uint64]bool{}
+	named := map[uint64]int{}
+	var dropped []loggedEvent
+	for _, line := range lines {
+		stored[line.Seq] = true
+		if line.Event != "log.dropped" {
+			continue
+		}
+		dropped = append(dropped, line)
+		from, to := uint64(line.Fields["from_seq"].(float64)), uint64(line.Fields["to_seq"].(float64))
+		for seq := from; seq <= to; seq++ {
+			named[seq]++
+		}
+	}
+	if len(dropped) != 1 || dropped[0].Fields["channel"] != "debug" {
+		t.Fatalf("the main file holds log.dropped %+v, want one of the channel debug", dropped)
+	}
+	last := lines[len(lines)-1].Seq
+	for seq := uint64(1); seq <= last; seq++ {
+		if stored[seq] == (named[seq] > 0) || named[seq] > 1 {
+			t.Fatalf("seq %d is stored %v and named %d times, want exactly one of the two", seq, stored[seq], named[seq])
+		}
+	}
+}
+
+// A failed write of the main file is stored in the main file at the next write, which is the Close here.
+func TestAFailedMainWriteIsStoredAtTheNextWriteAfterClose(t *testing.T) {
+	var failures atomic.Int32
+	log := startLog(t, func(options *events.Options) {
+		options.BatchInterval = time.Hour
+		options.Write = func(file *os.File, data []byte) error {
+			if !strings.HasSuffix(file.Name(), ".debug.jsonl") && failures.Add(-1) >= 0 {
+				return fmt.Errorf("write failed on purpose")
+			}
+			_, err := file.Write(data)
+			return err
+		}
+	})
+	failures.Store(1)
+	log.EmitHost(events.LevelInfo, "sidecar.files.start", map[string]any{"i": 1})
+	if err := log.Flush(5 * time.Second); err != nil {
+		t.Fatal(err)
+	}
+	log.Close()
+	lines := readEvents(t, log.Path())
+	var dropped []loggedEvent
+	for _, line := range lines {
+		if line.Event == "log.dropped" {
+			dropped = append(dropped, line)
+		}
+	}
+	if len(dropped) != 1 || dropped[0].Fields["channel"] != "other" {
+		t.Fatalf("the main file holds log.dropped %+v, want one of the channel other", dropped)
+	}
+}
+
 // A failed write of the main file keeps the loss that each log.dropped line of its batch holds with that line's channel and
 // reason, and every seq of the file is either stored or named by exactly one log.dropped.
 func TestAFailedMainBatchKeepsTheChannelAndReasonOfEachLoss(t *testing.T) {

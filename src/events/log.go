@@ -646,8 +646,10 @@ func (l *Log) run(file *os.File, first *pendingEvent) {
 		f.items = append(f.items, batchItem{seq: seq, bytes: uint64(len(line)), drop: e.drop})
 		f.size += int64(len(line))
 	}
+	// storeLosses is declared before begin, which calls it.
+	var storeLosses func(f *channelFile)
 	// begin stores the log.open of a file that has none in its batch, with the note of the rotation that made the file. Then it
-	// stores the log.dropped of a write that the disk refused, in the main file.
+	// stores the losses of the refused writes of the file (storeLosses).
 	var begin func(f *channelFile)
 	begin = func(f *channelFile) {
 		if !f.onDisk && !f.inBatchOpen {
@@ -674,14 +676,19 @@ func (l *Log) run(file *os.File, first *pendingEvent) {
 				f.rotated = nil
 			}
 		}
-		// A write that the disk refused left the ranges that no line holds. Their log.dropped lines go to the main file.
-		if len(f.pending) > 0 {
-			lost := f.pending
-			f.pending = nil
-			for _, record := range lost {
-				begin(otherChannel)
-				appendLine(otherChannel, l.dropped(record))
-			}
+		storeLosses(f)
+	}
+	// storeLosses stores the log.dropped of the writes of a file that the disk refused, in the main file, with the next batch
+	// of the main file. begin calls it before an event of the file, and write calls it for each file, so a loss is stored at
+	// the next write even when no event of its file follows.
+	storeLosses = func(f *channelFile) {
+		lost := f.pending
+		f.pending = nil
+		if len(lost) > 0 {
+			begin(otherChannel)
+		}
+		for _, record := range lost {
+			appendLine(otherChannel, l.dropped(record))
 		}
 	}
 	flush := func(f *channelFile) {
@@ -775,9 +782,11 @@ func (l *Log) run(file *os.File, first *pendingEvent) {
 	write := func() {
 		recordLoss()
 		recordPolicy()
-		// The debug file is flushed first: a write of it that the disk refuses stores its log.dropped in the main file, which
-		// the main file then writes.
+		// The debug file is flushed first. The losses of both files are stored in the main batch before the main file is
+		// written, so a loss that a write of either file refused is written by this write.
 		flush(debugChannel)
+		storeLosses(debugChannel)
+		storeLosses(otherChannel)
 		flush(otherChannel)
 		// Every event that the batches held is written or counted as lost now, so the queue is no longer charged for it.
 		l.queuedEvents.Add(-heldEvents)

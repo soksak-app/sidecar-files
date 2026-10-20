@@ -4,6 +4,8 @@
 
 ## 미배포
 
+- S30: 실패한 쓰기의 대기 중인 손실 기록을 다음 쓰기에 저장한다. 이전에는 debug 쓰기가 실패한 손실을 다음 debug event가 와야 저장했고, main 쓰기가 실패한 손실도 다음 main event가 와야 저장해서, 실패 뒤 Close만 오면 어떤 seq 범위도 저장도 기록도 되지 않았다.
+
 - S29: 실패한 쓰기는 batch가 담은 loss를 모두 유지한다. batch의 각 `log.dropped` 줄은 자기 channel과 reason으로 다시 기록하고, 나머지 줄은 연속된 seq의 run마다 실패한 쓰기의 기록 하나로 남긴다. 이전에는 debug loss를 담은 main file의 실패한 batch가 loss를 channel `other`의 기록 하나로 합쳤다.
 
 - S27: loss를 channel과 reason별로 센다. 각 `log.dropped`는 channel(error, warn, info는 `other`, debug와 trace는 `debug`)을 담고 main file에 저장된다. debug file의 write 실패도 channel debug로 기록된다.
