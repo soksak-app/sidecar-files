@@ -10,7 +10,11 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
+
+// recordTimeLayout is the form of the time of a text record (docs/spec/diagnostics.md#forms).
+const recordTimeLayout = "2006-01-02T15:04:05.000Z07:00"
 
 var (
 	buildOnce  sync.Once
@@ -90,6 +94,49 @@ func find(lines []loggedEvent, event string) *loggedEvent {
 	return nil
 }
 
+// startRecord asserts that stderr is exactly the start record of the process, in the form of a text record
+// (docs/spec/diagnostics.md#forms), and returns the time that the record states. The host stores each line of the standard
+// error of a standard input and output sidecar as a record of level info, so the record shows the time from the spawn of the
+// process to its first own record (S31).
+func startRecord(t *testing.T, stderr string) time.Time {
+	t.Helper()
+	lines := strings.Split(strings.TrimSuffix(stderr, "\n"), "\n")
+	if len(lines) != 1 {
+		t.Fatalf("the process wrote %d lines: %q", len(lines), stderr)
+	}
+	parts := strings.SplitN(lines[0], " ", 5)
+	if len(parts) != 5 || parts[1] != "info" || parts[2] != "sidecar" || parts[3] != "files:" || parts[4] != "started" {
+		t.Fatalf("the line is not the start record of the process: %q", lines[0])
+	}
+	at, err := time.Parse(recordTimeLayout, parts[0])
+	if err != nil {
+		t.Fatalf("the time of the start record %q: %v", parts[0], err)
+	}
+	return at
+}
+
+// contract: sidecar.log.the-process-starts-with-its-own-record
+func TestTheProcessStartsWithItsOwnRecord(t *testing.T) {
+	folder := filepath.Join(t.TempDir(), "logs")
+	stderr, status := runSidecar(t, "", "--log-dir", folder)
+	if status != 0 {
+		t.Fatalf("status %d, standard error %q", status, stderr)
+	}
+	at := startRecord(t, stderr)
+	if elapsed := time.Since(at); elapsed < 0 || elapsed > time.Minute {
+		t.Fatalf("the start record time %v is not the time of this run: %v before now", at, elapsed)
+	}
+	// The record is written before the setup of the process, so it precedes the log.open that the writer writes after the
+	// setup.
+	open := find(onlyEventFile(t, folder), "log.open")
+	if open == nil {
+		t.Fatal("the event file holds no log.open")
+	}
+	if opened := time.UnixMicro(open.TsMicros); opened.Before(at) {
+		t.Fatalf("log.open at %v precedes the start record at %v", opened, at)
+	}
+}
+
 // contract: log.sidecar.failure-ends-with-an-error-event
 func TestAFailureThatEndsTheSidecarIsAnErrorEventAndAnExit(t *testing.T) {
 	config := t.TempDir()
@@ -114,9 +161,12 @@ func TestACleanEndStatesStatusZero(t *testing.T) {
 	config := t.TempDir()
 	replace(t, filepath.Join(config, "log-policy.json"), policyText(nil))
 	folder := filepath.Join(config, "logs")
-	if stderr, status := runSidecar(t, "", "--log-dir", folder); status != 0 || stderr != "" {
+	stderr, status := runSidecar(t, "", "--log-dir", folder)
+	// The start record is the only line of the standard error of a clean run.
+	if status != 0 {
 		t.Fatalf("status %d, standard error %q", status, stderr)
 	}
+	startRecord(t, stderr)
 	exit := find(onlyEventFile(t, folder), "sidecar.files.exit")
 	if exit == nil || exit.Fields["status"] != float64(0) || exit.Level != "info" {
 		t.Fatalf("exit %+v", exit)
@@ -147,9 +197,12 @@ func TestTheSidecarAppliesThePolicyFileOfTheParentOfTheLogFolder(t *testing.T) {
 	folder := filepath.Join(config, "logs")
 	root := t.TempDir()
 	request := requestWith(t, []string{"b1.1"}, root, map[string]any{"operation": "list", "id": "l1", "path": ""})
-	if stderr, status := runSidecar(t, request+"\n", "--log-dir", folder); status != 0 || stderr != "" {
+	stderr, status := runSidecar(t, request+"\n", "--log-dir", folder)
+	// The start record is the only line of the standard error of a clean run.
+	if status != 0 {
 		t.Fatalf("status %d, standard error %q", status, stderr)
 	}
+	startRecord(t, stderr)
 	lines := onlyEventFile(t, folder)
 	if len(eventsNamed(lines, "sidecar.files.request")) != 0 {
 		t.Fatalf("a request was stored while the class call is off: %+v", lines)

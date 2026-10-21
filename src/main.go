@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"time"
 
 	catalog "github.com/soksak-app/sidecar-files"
 	"github.com/soksak-app/sidecar-files/src/events"
@@ -20,6 +21,9 @@ import (
 	"github.com/soksak-app/sidecar-files/src/routine"
 )
 
+// recordTimeLayout is the form of the time of a text record (docs/spec/diagnostics.md#forms).
+const recordTimeLayout = "2006-01-02T15:04:05.000Z07:00"
+
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
 }
@@ -27,6 +31,12 @@ func main() {
 // run starts the event log, serves the requests and returns the exit status: 0 when the input ended, 1 for a failure that
 // ended the sidecar and 2 for an argument that is not valid.
 func run(args []string, in io.Reader, out, stderr io.Writer) int {
+	// The first action of the process, before any other statement and before any setup: one text record
+	// (docs/spec/diagnostics.md#forms) on the standard error, which the host stores as a record of the layer sidecar, so the
+	// time from the spawn of the process to its first own record is visible (S31). The record goes to the standard error and
+	// not to the event file, because the file of the contract starts with log.open and the writer that writes it exists only
+	// after the setup reads the arguments and the platform.
+	fmt.Fprintf(stderr, "%s info sidecar files: started\n", time.Now().UTC().Format(recordTimeLayout))
 	flags := flag.NewFlagSet("files sidecar", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	logDir := flags.String("log-dir", "", "the folder of the event file")
