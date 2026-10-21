@@ -1,8 +1,8 @@
 {
   "name": "@soksak/sidecar-files",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "private": true,
-  "description": "Files sidecar: lists directories inside a project folder over line-delimited JSON.",
+  "description": "Files sidecar: lists, watches, and snapshots project file trees over line-delimited JSON.",
   "license": "MIT",
   "repository": {
     "type": "git",

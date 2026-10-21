@@ -45,6 +45,9 @@ func requestFields(request Request, operation string, started time.Time, err err
 	if len(request.Body.Paths) > 0 {
 		fields["paths"] = request.Body.Paths
 	}
+	if request.Body.Generation > 0 {
+		fields["generation"] = request.Body.Generation
+	}
 	if err != nil {
 		fields["error"] = events.ResultError(internalCode, err.Error())
 	}

@@ -5,6 +5,9 @@
 //	입력  {"surface": id, "root": 경로, "body": {"operation": "list", "id": 요청, "path": 상대 경로}}
 //	      {"surface": id, "root": 경로, "body": {"operation": "watch", "id": 요청, "paths": [상대 경로]}}
 //	      {"surface": id, "root": 경로, "body": {"operation": "git", "id": 요청}}
+//	      {"surface": id, "root": 경로, "body": {"operation": "snapshot", "id": 요청}}
+//	      {"surface": id, "root": 경로, "body": {"operation": "expand"|"collapse", "id": 요청, "generation": 세대, "path": 상대 경로}}
+//	      {"surface": id, "root": 경로, "body": {"operation": "select", "id": 요청, "generation": 세대, "path": 경로|""}}
 //	      {"surface": id, "root": 경로, "body": {"operation": "read", "id": 요청, "path": 상대 경로}}
 //	      {"surface": id, "root": 경로, "body": {"operation": "write", "id": 요청, "path": 상대 경로, "text": 내용, "expect": 판|null, "bom": 참거짓}}
 //	      {"surface": id, "root": 경로, "body": {"operation": "readBytes", "id": 요청, "path": 상대 경로}}
@@ -12,6 +15,7 @@
 //	      {"surface": id, "closed": true}
 //	출력  {"surface": id, "body": {"id": 요청, "entries": [{"name": 이름, "directory": 참거짓}]}}
 //	      {"surface": id, "body": {"id": 요청, "entries": [{"path": 상대 경로, "status": 상태}]}}
+//	      {"surface": id, "body": {"id": 요청, "tree": {"generation": 세대, "entries": [{"path": 경로, "name": 이름, "directory": 참거짓, "depth": 깊이, "expanded": 참거짓, "selected": 참거짓, "detail"?: git상태}], "selected": 경로|null}}}
 //	      {"surface": id, "body": {"id": 요청, "text": 내용, "version": 판, "newline": 줄바꿈, "bom": 참거짓}}
 //	      {"surface": id, "body": {"id": 요청, "version": 판}}
 //	      {"surface": id, "body": {"id": 요청}}
@@ -55,10 +59,11 @@ type Request struct {
 	Cids   []string `json:"cids,omitempty"`
 	Closed bool     `json:"closed,omitempty"`
 	Body   struct {
-		Operation string   `json:"operation"`
-		ID        string   `json:"id"`
-		Path      string   `json:"path"`
-		Paths     []string `json:"paths"`
+		Operation  string   `json:"operation"`
+		ID         string   `json:"id"`
+		Path       string   `json:"path"`
+		Paths      []string `json:"paths"`
+		Generation uint64   `json:"generation"`
 		// Text, Expect, BOM 은 write 에만 있다. Expect 는 빠진 필드와 null 을 구별하려고 원문 그대로 받는다.
 		Text   *string         `json:"text"`
 		Expect json.RawMessage `json:"expect"`
@@ -87,8 +92,9 @@ type EventBody struct {
 	Newline string  `json:"newline,omitempty"`
 	BOM     *bool   `json:"bom,omitempty"`
 	// Changed 는 항목이 바뀐 감시 디렉터리나 내용이 바뀐 감시 파일의 상대 경로다. 프로젝트 폴더는 빈 문자열이다.
-	Changed *string `json:"changed,omitempty"`
-	Error   string  `json:"error,omitempty"`
+	Changed *string       `json:"changed,omitempty"`
+	Error   string        `json:"error,omitempty"`
+	Tree    *TreeSnapshot `json:"tree,omitempty"`
 }
 
 // Event 는 호스트에 보내는 메시지 하나다. 요청의 답과 변경은 Body 를, closed 의 답은 Closed 와 닫지 못한 까닭
@@ -123,6 +129,7 @@ func Serve(in io.Reader, out io.Writer, log *events.Log) error {
 		return writeErr
 	}
 	watches := newWatches(send, log)
+	trees := newTreeRoutes()
 	defer watches.closeAll()
 	scanner := bufio.NewScanner(in)
 	// 요청 줄은 sidecar 출력 줄의 한도인 67108864 바이트까지다. 버퍼는 그 줄과 줄바꿈을 함께 담는다.
@@ -138,6 +145,7 @@ func Serve(in io.Reader, out io.Writer, log *events.Log) error {
 		trace := Trace{Log: log, Surface: request.Surface, Cids: request.Cids}
 		started := time.Now()
 		if request.Closed {
+			trees.close(request.Surface)
 			// 감시를 끝낸 뒤 모든 closed 에 답한다.
 			answer := Event{Surface: request.Surface, Cids: request.Cids, Closed: true}
 			err := watches.set(request.Surface, "", nil, "closed", trace)
@@ -148,7 +156,7 @@ func Serve(in io.Reader, out io.Writer, log *events.Log) error {
 			send(answer)
 		} else {
 			body := EventBody{ID: request.Body.ID}
-			err := handle(watches, request, &body, trace)
+			err := handle(watches, trees, request, &body, trace)
 			if err != nil {
 				body = EventBody{ID: request.Body.ID, Error: err.Error()}
 			}
@@ -162,7 +170,7 @@ func Serve(in io.Reader, out io.Writer, log *events.Log) error {
 	return scanner.Err()
 }
 
-func handle(watches *watches, request Request, body *EventBody, trace Trace) error {
+func handle(watches *watches, trees *treeRoutes, request Request, body *EventBody, trace Trace) error {
 	if request.Root == "" {
 		return fmt.Errorf("%s requires a root", request.Body.Operation)
 	}
@@ -191,6 +199,25 @@ func handle(watches *watches, request Request, body *EventBody, trace Trace) err
 		return writeBytesRequest(request, body)
 	case "watch":
 		return watches.set(request.Surface, request.Root, request.Body.Paths, "replaced", trace)
+	case "snapshot":
+		route := trees.snapshot(request.Surface, request.Root)
+		snapshot, err := route.update(request.Root, request.Surface, request.Body.Operation, request, trace, watches)
+		if err != nil {
+			return err
+		}
+		body.Tree = snapshot
+		return nil
+	case "expand", "collapse", "select":
+		route, err := trees.route(request.Surface, request.Root, request.Body.Generation)
+		if err != nil {
+			return err
+		}
+		snapshot, err := route.update(request.Root, request.Surface, request.Body.Operation, request, trace, watches)
+		if err != nil {
+			return err
+		}
+		body.Tree = snapshot
+		return nil
 	default:
 		return fmt.Errorf("unknown operation %q", request.Body.Operation)
 	}

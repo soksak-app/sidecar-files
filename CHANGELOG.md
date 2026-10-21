@@ -32,3 +32,5 @@
 - S18.2: every goroutine starts through `src/routine`, which records a panic as `sidecar.files.panic` and ends the process with status 2; `main` takes `--log-dir` and stores `sidecar.files.start`, `sidecar.files.failure` and `sidecar.files.exit` instead of only printing the failure.
 - S18.1: the event writer (`src/events`) stores `files-<boot>.jsonl` in schema 2 with microsecond `ts_us`, `mono_ns`, `cids`, a bounded queue, `log.dropped`, rotation and a flush with a deadline; the platform reads the monotonic clock.
 - S17: the documents and comments call plugins, sidecars and releases by those words.
+
+- F238-d-16: add host-read-only `snapshot`, `expand`, `collapse`, and `select` tree operations. The sidecar owns visible rows, per-path git details, selection, expanded directories, and route generations; each reply carries a full fresh snapshot and echoes request `cids`. Session close, root change, and process restart reset the appropriate in-memory route state.

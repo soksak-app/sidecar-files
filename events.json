@@ -117,6 +117,7 @@
         "id?": "string",
         "path?": "string",
         "paths?": "array",
+        "generation?": "number",
         "ok": "boolean",
         "micros": "number",
         "error?": "string"
