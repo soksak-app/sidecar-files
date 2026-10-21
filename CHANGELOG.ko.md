@@ -3,6 +3,7 @@
 [English](CHANGELOG.md)
 
 ## 미배포
+- S34: `TestWatchReportsAChangedFileContent`가 macOS와 Linux에서 실행되도록 바뀌었다. Linux 실행과 정책 reload 검증은 미완료다.
 - S31: 프로세스가 어떤 setup보다 먼저 첫 동작으로 기록을 한 번 쓴다. 표준 오류에 쓰는 text record `<UTC time> info sidecar files: started`이고, host는 그것을 layer `sidecar`의 record로 저장하므로, 프로세스의 spawn부터 첫 기록까지의 시간이 보인다. 기록은 event file이 아니라 표준 오류로 간다. contract가 정한 file의 첫 줄은 `log.open`이기 때문이다. 깨끗하게 끝나는 실행은 이제 표준 오류에 정확히 이 기록만을 쓴다.
 
 - S30: 실패한 쓰기의 대기 중인 손실 기록을 다음 쓰기에 저장한다. 이전에는 debug 쓰기가 실패한 손실을 다음 debug event가 와야 저장했고, main 쓰기가 실패한 손실도 다음 main event가 와야 저장해서, 실패 뒤 Close만 오면 어떤 seq 범위도 저장도 기록도 되지 않았다.

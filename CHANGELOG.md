@@ -3,6 +3,7 @@
 [한국어](CHANGELOG.ko.md)
 
 ## Unreleased
+- S34: `TestWatchReportsAChangedFileContent` now runs on Linux as well as macOS; Linux execution and policy-reload validation remain pending.
 - S31: The process writes one record as its first action, before any setup: the text record `<UTC time> info sidecar files: started` on the standard error, which the host stores as a record of the layer `sidecar`, so the time from the spawn of the process to its first own record is visible. The record goes to the standard error and not to the event file, because the file of the contract starts with `log.open`. A clean run now writes exactly that record on its standard error.
 
 - S30: A failed write stores its pending loss records at the next write. Before, a loss of a failed debug write was stored only when a later debug event arrived, and a loss of a failed main write only when a later main event arrived, so a failed write followed only by Close left a range of seq neither stored nor named.

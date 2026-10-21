@@ -117,8 +117,8 @@ func TestWatchRejectsPathsOutsideTheRoot(t *testing.T) {
 }
 
 func TestWatchReportsAChangedFileContent(t *testing.T) {
-	if runtime.GOOS != "darwin" {
-		t.Skipf("watching file content is implemented only on darwin, not on %s", runtime.GOOS)
+	if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
+		t.Skipf("watching file content is not implemented on %s", runtime.GOOS)
 	}
 	root := t.TempDir()
 	path := filepath.Join(root, "notes.txt")
