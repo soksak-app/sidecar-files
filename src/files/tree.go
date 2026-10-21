@@ -32,6 +32,9 @@ type treeRoute struct {
 	listings   map[string][]Entry
 }
 
+type treeLister func(root, relative string) ([]Entry, error)
+type treeWatchSet func(surface, root string, paths []string, reason string, trace Trace) error
+
 // treeRoutes is owned by one Serve process, so its surface key is scoped to one window as well as one sidecar session.
 type treeRoutes struct {
 	current    map[string]*treeRoute
@@ -76,7 +79,7 @@ func (routes *treeRoutes) route(surface, root string, generation uint64) (*treeR
 
 var gitDetailPriority = map[string]int{"deleted": 5, "modified": 4, "added": 3, "renamed": 2, "untracked": 1}
 
-func (route *treeRoute) update(root, surface, operation string, request Request, trace Trace, watches *watches) (*TreeSnapshot, error) {
+func (route *treeRoute) update(root, surface, operation string, request Request, trace Trace, list treeLister, setWatches treeWatchSet) (*TreeSnapshot, error) {
 	switch operation {
 	case "snapshot":
 	case "expand", "collapse", "select":
@@ -153,7 +156,7 @@ func (route *treeRoute) update(root, surface, operation string, request Request,
 				continue
 			}
 		}
-		entries, err := List(root, path)
+		entries, err := list(root, path)
 		if err != nil {
 			if path == "" {
 				return nil, err
@@ -171,7 +174,7 @@ func (route *treeRoute) update(root, surface, operation string, request Request,
 		watchPaths = append(watchPaths, path)
 	}
 	sort.Strings(watchPaths)
-	if err := watches.set(surface, root, watchPaths, "replaced", trace); err != nil {
+	if err := setWatches(surface, root, watchPaths, "replaced", trace); err != nil {
 		return nil, err
 	}
 
