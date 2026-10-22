@@ -157,7 +157,9 @@ func Serve(in io.Reader, out io.Writer, log *events.Log) error {
 		} else {
 			body := EventBody{ID: request.Body.ID}
 			err := handle(watches, trees, request, &body, trace)
-			body = errorReplyBody(request, body, err)
+			if err != nil {
+				body = EventBody{ID: request.Body.ID, Error: err.Error()}
+			}
 			trace.request(request, request.Body.Operation, started, err)
 			send(Event{Surface: request.Surface, Cids: request.Cids, Body: &body})
 		}
@@ -166,13 +168,6 @@ func Serve(in io.Reader, out io.Writer, log *events.Log) error {
 		}
 	}
 	return scanner.Err()
-}
-
-func errorReplyBody(request Request, body EventBody, err error) EventBody {
-	if err != nil {
-		return EventBody{ID: request.Body.ID, Error: err.Error()}
-	}
-	return body
 }
 
 func handle(watches *watches, trees *treeRoutes, request Request, body *EventBody, trace Trace) error {
@@ -206,7 +201,7 @@ func handle(watches *watches, trees *treeRoutes, request Request, body *EventBod
 		return watches.set(request.Surface, request.Root, request.Body.Paths, "replaced", trace)
 	case "snapshot":
 		route := trees.snapshot(request.Surface, request.Root)
-		snapshot, err := route.update(request.Root, request.Surface, request.Body.Operation, request, trace, List, watches.set)
+		snapshot, err := route.update(request.Root, request.Surface, request.Body.Operation, request, trace, watches)
 		if err != nil {
 			return err
 		}
@@ -217,7 +212,7 @@ func handle(watches *watches, trees *treeRoutes, request Request, body *EventBod
 		if err != nil {
 			return err
 		}
-		snapshot, err := route.update(request.Root, request.Surface, request.Body.Operation, request, trace, List, watches.set)
+		snapshot, err := route.update(request.Root, request.Surface, request.Body.Operation, request, trace, watches)
 		if err != nil {
 			return err
 		}
