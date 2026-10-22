@@ -3,6 +3,8 @@
 [English](CHANGELOG.md)
 
 ## 미배포
+
+- S38: pre-push 훅이 `make push-check`를 실행한다. 이것은 ci workflow와 같이 `make test`와 push 범위의 commit message 검사를 실행한다. Red: `tests/make-targets.test.mjs`가 없는 recipe와 없는 훅에서 실패했다. Green: 시험 2개 중 2개가 통과하고, `make push-check`가 통과한다.
 - S36: `log.dropped` record가 core 카탈로그가 선언한 `channel`과 `queued`를 담는다(F212.1-2-2-3-1). 기록기와 `events.json`은 S26에서 이미 둘을 가졌다. 이 항목은 줄에서 둘을 빼자 golden field test가 실패하는 Red 확인과 그 복구를 기록한다.
 - S35: tree test `TestDirectoryDetailFollowsTheRankOfItsDescendantStatuses`가 디렉터리 detail을 자손 status의 순위(deleted, modified, added, renamed, untracked)와 대조한다. code가 순위와 일치하므로 이 test는 pin이다. `renamed`를 `deleted`보다 높이는 변이는 test를 실패시켰다.
 - F238-d-16: host가 읽기만 하는 tree 연산 `snapshot`, `expand`, `collapse`, `select`를 추가한다. sidecar가 보이는 행, 경로별 git detail, 선택, 펼친 directory, route generation을 소유하며, 각 응답은 전체 snapshot을 담고 요청의 `cids`를 되돌린다. session 닫기, root 변경, 프로세스 재시작은 해당하는 메모리 내 route 상태를 초기화한다.

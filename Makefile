@@ -1,5 +1,5 @@
 # files sidecar repository 의 test, build, release(docs/features.md). release 는 core 의 sok 를 쓴다.
-.PHONY: test build release hooks
+.PHONY: test build release push-check hooks
 
 GO_FLAGS ?=
 SOK ?= sok
@@ -22,6 +22,11 @@ build:
 release: build
 	@test -n "$(OUT)" || { echo "make release OUT=<folder>" >&2; exit 2; }
 	$(SOK) sidecar release . $(OUT)
+
+# The checks that a push needs: make test, then the commit messages of the pushed range.
+# RANGE holds the commits of the pushed refs; the pre-push hook sets it, and it defaults to origin/main..HEAD.
+push-check: test
+	pnpm exec soksak-commits "$(or $(RANGE),origin/main..HEAD)"
 
 # Sets this repository to use .githooks, which checks commit messages and records at commit time.
 hooks:
