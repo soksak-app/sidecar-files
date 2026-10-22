@@ -9,8 +9,12 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 // Prints the recipe of a target without running it; the recipe lines name every command the target runs.
+// MAKEFLAGS and RANGE come from an outer make (the pre-push hook passes RANGE), so they are removed to print the default range.
 function recipe(target) {
-  const result = spawnSync("make", ["-n", target], { cwd: root, encoding: "utf8", timeout: 30000 });
+  const env = { ...process.env };
+  delete env.MAKEFLAGS;
+  delete env.RANGE;
+  const result = spawnSync("make", ["-n", target], { cwd: root, encoding: "utf8", timeout: 30000, env });
   assert.equal(result.status, 0, `make -n ${target} failed: ${result.stderr}`);
   return result.stdout;
 }
