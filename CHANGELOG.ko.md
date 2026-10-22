@@ -3,6 +3,7 @@
 [English](CHANGELOG.md)
 
 ## 미배포
+- F238-d-16: host가 읽기만 하는 tree 연산 `snapshot`, `expand`, `collapse`, `select`를 추가한다. sidecar가 보이는 행, 경로별 git detail, 선택, 펼친 directory, route generation을 소유하며, 각 응답은 전체 snapshot을 담고 요청의 `cids`를 되돌린다. session 닫기, root 변경, 프로세스 재시작은 해당하는 메모리 내 route 상태를 초기화한다.
 - S34: `TestWatchReportsAChangedFileContent`가 macOS와 Linux에서 실행되도록 바뀌었다. Linux 실행과 정책 reload 검증은 미완료다.
 - S31: 프로세스가 어떤 setup보다 먼저 첫 동작으로 기록을 한 번 쓴다. 표준 오류에 쓰는 text record `<UTC time> info sidecar files: started`이고, host는 그것을 layer `sidecar`의 record로 저장하므로, 프로세스의 spawn부터 첫 기록까지의 시간이 보인다. 기록은 event file이 아니라 표준 오류로 간다. contract가 정한 file의 첫 줄은 `log.open`이기 때문이다. 깨끗하게 끝나는 실행은 이제 표준 오류에 정확히 이 기록만을 쓴다.
 
