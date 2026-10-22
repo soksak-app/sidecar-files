@@ -167,7 +167,12 @@ func Serve(in io.Reader, out io.Writer, log *events.Log) error {
 			return err
 		}
 	}
-	return scanner.Err()
+	if err := scanner.Err(); err != nil {
+		return err
+	}
+	// A write of a watch change can fail while no request follows it. written takes the lock that the failed write holds, so
+	// the failure is returned here and not dropped when the input closes.
+	return written()
 }
 
 func handle(watches *watches, trees *treeRoutes, request Request, body *EventBody, trace Trace) error {

@@ -2,12 +2,15 @@ package files_test
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -142,5 +145,64 @@ func TestWatchReportsAChangedFileContent(t *testing.T) {
 	}
 	if event := s.next("change of notes.txt"); event.Body.Changed == nil || *event.Body.Changed != "notes.txt" || event.Body.Error != "" {
 		t.Fatalf("event = %+v, want changed notes.txt", *event.Body)
+	}
+}
+
+// writerFunc adapts a function to io.Writer.
+type writerFunc func([]byte) (int, error)
+
+func (f writerFunc) Write(p []byte) (int, error) { return f(p) }
+
+// A write of a watch change that fails while the input is idle is returned by Serve when the input closes, because no
+// request follows it to report it.
+func TestAWatchEventWriteFailureWhileIdleIsReturnedWhenInputCloses(t *testing.T) {
+	root := t.TempDir()
+	inRead, inWrite := io.Pipe()
+	replied := make(chan struct{})
+	changed := make(chan struct{})
+	var replyOnce, changeOnce sync.Once
+	out := writerFunc(func(p []byte) (int, error) {
+		if bytes.Contains(p, []byte(`"changed":`)) {
+			changeOnce.Do(func() { close(changed) })
+			return 0, errors.New("write failed on purpose")
+		}
+		if bytes.Contains(p, []byte(`"id":"w"`)) {
+			replyOnce.Do(func() { close(replied) })
+		}
+		return len(p), nil
+	})
+	done := make(chan error, 1)
+	go func() { done <- files.Serve(inRead, out, nil) }()
+	line, err := json.Marshal(map[string]any{"surface": "state:files:p1", "root": root, "body": map[string]any{"operation": "watch", "id": "w", "paths": []string{"."}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := inWrite.Write(append(line, '\n')); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-replied:
+	case <-time.After(5 * time.Second):
+		t.Fatal("no watch reply")
+	}
+	if err := os.WriteFile(filepath.Join(root, "changed.txt"), []byte("a"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-changed:
+	case <-time.After(5 * time.Second):
+		t.Fatal("no change event was written")
+	}
+	// The change event holds the writer's lock while it fails, so the input closes after the failure is recorded.
+	if err := inWrite.Close(); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case err := <-done:
+		if err == nil || !strings.Contains(err.Error(), "write failed on purpose") {
+			t.Fatalf("serve returned %v, want the write failure of the change event", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("serve did not return after the input closed")
 	}
 }
