@@ -21,4 +21,5 @@
 | `{operation: "readBytes", id, path}` | `{id, data, version}`: 정규 파일 `root/path`의 bytes를 padding이 있는 표준 base64로 `data`에, 그 SHA-256을 `version`에 담는다. 33554432 bytes를 넘는 파일은 내용을 읽기 전에 `file is <n> bytes, above the 33554432-byte limit: <path>`로 실패하고, 정규 파일이 아닌 경로는 `not a regular file: <path>`로 실패한다 |
 | `{operation: "writeBytes", id, path, data, expect}` | `{id, version}`: `data`가 padding이 있는 표준 base64로 담은 bytes를 `write`의 제자리, `expect`, 생성 규칙으로 `root/path`에 쓰고 그 SHA-256을 반환한다. 표준 base64가 아닌 `data`는 `writeBytes data is not base64`로 실패하고, 33554432 bytes를 넘는 decode한 bytes는 큰 `readBytes`처럼 실패한다 |
 | `closed` | 세션의 감시를 멈춘 뒤 끝나면 `{surface, closed: true}`로 답하고, 멈추지 못하면 `{surface, closed: true, error}`로 답한다. 이 답은 core의 `docs/spec/sidecars.md#messages`가 정한 닫기 답이다 |
+| 잘못된 요청 줄 | 줄이 자기 surface를 밝히면 `{surface, body: {id, error}}`이다. 오류 문구는 파싱이나 형식 실패를 밝힌다. 읽을 수 있는 surface가 없는 줄은 답이 없고 기록되며, sidecar는 계속 실행하고 다음 요청에 답한다. |
 | 모든 실패 | `{id, error}`: `root`가 없거나, `path`가 절대 경로이거나 (심볼릭 링크를 따라간 뒤) `root`를 벗어나거나, 디렉터리를 읽을 수 없는 경우 |

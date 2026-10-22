@@ -90,7 +90,16 @@
       "fields": {
         "error": "string"
       },
-      "description": "A failure ended the sidecar: a request line that is not valid, a reply that cannot be written, or a read error."
+      "description": "A failure ended the sidecar: a reply that cannot be written, or a read error."
+    },
+    "sidecar.files.request_refused": {
+      "layer": "sidecar",
+      "class": "lifecycle",
+      "level": "error",
+      "fields": {
+        "error": "string"
+      },
+      "description": "A request line was refused: it does not parse or names no surface. The sidecar answers a line that names its surface with the error, and keeps running."
     },
     "sidecar.files.panic": {
       "layer": "sidecar",

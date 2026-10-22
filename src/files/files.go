@@ -131,16 +131,37 @@ func Serve(in io.Reader, out io.Writer, log *events.Log) error {
 	watches := newWatches(send, log)
 	trees := newTreeRoutes()
 	defer watches.closeAll()
+	// refuse answers an invalid request line with its error on the surface the line names, and logs the line when it names none.
+	refuse := func(line []byte, cause error) {
+		var head struct {
+			Surface string `json:"surface"`
+			Body    struct {
+				ID string `json:"id"`
+			} `json:"body"`
+		}
+		// A line that does not parse names no surface, and a part that does not match the form names no id; both are the cause of the
+		// refusal, which is written in the reply and the log, so the parse error of head is not a second failure.
+		_ = json.Unmarshal(line, &head)
+		log.EmitHost(events.LevelError, "sidecar.files.request_refused", map[string]any{"error": cause.Error()})
+		if head.Surface == "" {
+			return
+		}
+		send(Event{Surface: head.Surface, Body: &EventBody{ID: head.Body.ID, Error: "invalid request: " + cause.Error()}})
+	}
 	scanner := bufio.NewScanner(in)
 	// 요청 줄은 sidecar 출력 줄의 한도인 67108864 바이트까지다. 버퍼는 그 줄과 줄바꿈을 함께 담는다.
 	scanner.Buffer(make([]byte, 0, 64*1024), lineLimit+1)
 	for scanner.Scan() {
 		var request Request
 		if err := json.Unmarshal(scanner.Bytes(), &request); err != nil {
-			return fmt.Errorf("invalid request: %w", err)
+			// An invalid request is refused and the sidecar keeps running. The surface of the line names where the refusal goes, if the
+			// line has a readable one; a line without it has no reply and is only logged.
+			refuse(scanner.Bytes(), err)
+			continue
 		}
 		if request.Surface == "" {
-			return fmt.Errorf("request without surface: %s", scanner.Text())
+			refuse(scanner.Bytes(), fmt.Errorf("request without surface"))
+			continue
 		}
 		trace := Trace{Log: log, Surface: request.Surface, Cids: request.Cids}
 		started := time.Now()

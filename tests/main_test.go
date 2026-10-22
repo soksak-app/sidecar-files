@@ -142,13 +142,15 @@ func TestAFailureThatEndsTheSidecarIsAnErrorEventAndAnExit(t *testing.T) {
 	config := t.TempDir()
 	replace(t, filepath.Join(config, "log-policy.json"), policyText(nil))
 	folder := filepath.Join(config, "logs")
-	stderr, status := runSidecar(t, "not json\n", "--log-dir", folder)
-	if status != 1 || !strings.Contains(stderr, "invalid request") {
+	// An invalid request line is refused and the sidecar keeps running, so the failure that ends it is a read failure: a line over the
+	// line limit of the protocol (docs/spec/files.md).
+	stderr, status := runSidecar(t, strings.Repeat("x", 67108864+1)+"\n", "--log-dir", folder)
+	if status != 1 || !strings.Contains(stderr, "token too long") {
 		t.Fatalf("status %d, standard error %q", status, stderr)
 	}
 	lines := onlyEventFile(t, folder)
 	failure, exit := find(lines, "sidecar.files.failure"), find(lines, "sidecar.files.exit")
-	if failure == nil || failure.Level != "error" || !strings.Contains(failure.Fields["error"].(string), "invalid request") {
+	if failure == nil || failure.Level != "error" || !strings.Contains(failure.Fields["error"].(string), "token too long") {
 		t.Fatalf("failure %+v", failure)
 	}
 	if exit == nil || exit.Fields["status"] != float64(1) || exit.Seq <= failure.Seq {

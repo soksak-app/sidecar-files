@@ -4,6 +4,7 @@
 
 ## Unreleased
 
+- S40: An invalid request line is refused and the files sidecar keeps running: a line that names its surface is answered with its error on that surface, and a line without a readable surface is logged and skipped. Red: the test `TestAnInvalidRequestIsRefusedAndTheSidecarKeepsRunning` failed with `serve: invalid request` when the sidecar exited on the first invalid line. Green: the test passes and the next request is answered.
 - S39: The make-targets test clears `MAKEFLAGS` and `RANGE` from the environment of the child make, so the default range is printed inside the pre-push hook. Red: with `RANGE` set, the default range assertion failed. Green: the test passes with and without `RANGE`.
 - S38: The pre-push hook runs `make push-check`, which runs `make test` and the commit message check of the pushed range, as the ci workflow does. Red: `tests/make-targets.test.mjs` failed on the missing recipe and the missing hook. Green: 2 of 2 tests pass, and `make push-check` passes.
 - S36: The `log.dropped` record carries `channel` and `queued` as the core catalog declares them (F212.1-2-2-3-1). The emitter and `events.json` already had both from S26; this entry records the Red check, in which removing them from the emitted line failed the golden field tests, and its restoration.

@@ -111,3 +111,19 @@ func TestClosedIsAnsweredAfterItsWatchesEnd(t *testing.T) {
 		t.Fatalf("the last message is %v, want the close answer %v", answer, want)
 	}
 }
+
+// An invalid request is refused and the sidecar keeps running: a request whose surface can be read is answered with its error,
+// and a line without a readable surface has no reply, so it is only logged and the next request is answered.
+func TestAnInvalidRequestIsRefusedAndTheSidecarKeepsRunning(t *testing.T) {
+	root := t.TempDir()
+	events := serve(t, `{"surface": 3`, `{"surface":"state:files:p1","body":"not an object"}`, request(t, root, "7", ""))
+	if len(events) != 2 {
+		t.Fatalf("events = %d, want the refusal and the answer of the valid request", len(events))
+	}
+	if events[0].Surface != "state:files:p1" || events[0].Body == nil || events[0].Body.Error == "" {
+		t.Fatalf("refusal = %+v, want an error reply on the surface", events[0])
+	}
+	if events[1].Body == nil || events[1].Body.ID != "7" || events[1].Body.Error != "" {
+		t.Fatalf("answer = %+v, want the listing of request 7", events[1])
+	}
+}
