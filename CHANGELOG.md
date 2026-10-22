@@ -4,6 +4,7 @@
 
 ## Unreleased
 
+- S39: The make-targets test clears `MAKEFLAGS` and `RANGE` from the environment of the child make, so the default range is printed inside the pre-push hook. Red: with `RANGE` set, the default range assertion failed. Green: the test passes with and without `RANGE`.
 - S38: The pre-push hook runs `make push-check`, which runs `make test` and the commit message check of the pushed range, as the ci workflow does. Red: `tests/make-targets.test.mjs` failed on the missing recipe and the missing hook. Green: 2 of 2 tests pass, and `make push-check` passes.
 - S36: The `log.dropped` record carries `channel` and `queued` as the core catalog declares them (F212.1-2-2-3-1). The emitter and `events.json` already had both from S26; this entry records the Red check, in which removing them from the emitted line failed the golden field tests, and its restoration.
 - S35: The tree test `TestDirectoryDetailFollowsTheRankOfItsDescendantStatuses` checks the directory detail against the rank of its descendant statuses (deleted, modified, added, renamed, untracked). The code matches the rank, so the test is a pin. A mutation that ranked `renamed` above `deleted` failed the test.
