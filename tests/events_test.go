@@ -934,3 +934,61 @@ func TestResultErrorIsTheCodeAndTheTextCutToTheBound(t *testing.T) {
 		t.Fatalf("got %d bytes, valid %v", len(long), utf8.ValidString(long))
 	}
 }
+
+// A debug file that cannot be created loses its events, and the main file names the loss in a log.dropped of the channel
+// debug. The file is created at its first debug line, so a directory at its path makes the creation fail.
+func TestADebugFileThatCannotBeCreatedIsCountedInLogDropped(t *testing.T) {
+	log := startLog(t, nil)
+	if err := os.Mkdir(log.DebugPath(), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	log.EmitHost(events.LevelDebug, "sidecar.files.watch_change", map[string]any{"i": 1})
+	if err := log.Flush(5 * time.Second); err != nil {
+		t.Fatal(err)
+	}
+	var dropped []loggedEvent
+	for _, line := range readEvents(t, log.Path()) {
+		if line.Event == "log.dropped" {
+			dropped = append(dropped, line)
+		}
+	}
+	if len(dropped) != 1 || dropped[0].Fields["channel"] != "debug" || dropped[0].Fields["count"] != float64(1) {
+		t.Fatalf("the main file holds log.dropped %+v, want one of the channel debug with count 1", dropped)
+	}
+	if reason, _ := dropped[0].Fields["reason"].(string); !strings.Contains(reason, "the write failed") {
+		t.Fatalf("reason %q", reason)
+	}
+}
+
+// The text of a failed write that holds a control character is stored in log.dropped as valid JSON, so the loss is named.
+func TestALossReasonWithAControlCharacterIsStoredAsJSON(t *testing.T) {
+	var failures atomic.Int32
+	log := startLog(t, func(options *events.Options) {
+		options.Write = func(file *os.File, data []byte) error {
+			if failures.Add(-1) >= 0 {
+				return fmt.Errorf("write failed on purpose \x01")
+			}
+			_, err := file.Write(data)
+			return err
+		}
+	})
+	failures.Store(1)
+	log.EmitHost(events.LevelInfo, "sidecar.files.start", map[string]any{"i": 1})
+	if err := log.Flush(5 * time.Second); err != nil {
+		t.Fatal(err)
+	}
+	log.EmitHost(events.LevelInfo, "sidecar.files.start", map[string]any{"i": 2})
+	lines := finish(t, log)
+	var dropped *loggedEvent
+	for index := range lines {
+		if lines[index].Event == "log.dropped" {
+			dropped = &lines[index]
+		}
+	}
+	if dropped == nil {
+		t.Fatalf("no log.dropped in %+v", lines)
+	}
+	if reason, _ := dropped.Fields["reason"].(string); !strings.Contains(reason, "write failed on purpose") {
+		t.Fatalf("reason %q", reason)
+	}
+}

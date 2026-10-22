@@ -519,9 +519,26 @@ type loss struct {
 	channel, reason                string
 }
 
+// droppedFields are the fields of log.dropped in the order of the contract.
+type droppedFields struct {
+	FromSeq uint64 `json:"from_seq"`
+	ToSeq   uint64 `json:"to_seq"`
+	Count   uint64 `json:"count"`
+	Bytes   uint64 `json:"bytes"`
+	Reason  string `json:"reason"`
+	Channel string `json:"channel"`
+	Queued  uint64 `json:"queued"`
+}
+
 // dropped is the log.dropped event that names the range. It is stored in the main file (docs/spec/logging.md#writers).
 func (l *Log) dropped(lost loss) *pendingEvent {
-	fields := fmt.Sprintf(`{"from_seq":%d,"to_seq":%d,"count":%d,"bytes":%d,"reason":%q,"channel":%q,"queued":%d}`, lost.from, lost.to, lost.count, lost.bytes, lost.reason, lost.channel, lost.queued)
+	// The fields are encoded by encoding/json, because the reason can hold any text of an error, and a Go quoted string
+	// is not always a JSON string.
+	fields, err := json.Marshal(droppedFields{FromSeq: lost.from, ToSeq: lost.to, Count: lost.count, Bytes: lost.bytes, Reason: lost.reason, Channel: lost.channel, Queued: lost.queued})
+	if err != nil {
+		// The fields are integers and strings, which encoding/json always encodes; a failure is a defect that ends the writer.
+		panic(fmt.Sprintf("log.dropped fields: %v", err))
+	}
 	dropped := &pendingEvent{tsMicros: time.Now().UnixMicro(), monoNs: l.monotonicNanos(), level: LevelWarn, event: "log.dropped", fields: json.RawMessage(fields), drop: &lost}
 	l.classify(dropped)
 	return dropped
@@ -638,8 +655,9 @@ func (l *Log) run(file *os.File, first *pendingEvent) {
 		seq++
 		line, err := eventLine(seq, e)
 		if err != nil {
-			// The line is not written; the seq stays taken, so the audit shows the gap next to this report.
+			// The line is not written, so its seq stays taken and the pending loss names it in the next log.dropped.
 			fmt.Fprintf(os.Stderr, "event writer: %s cannot be written: %v\n", e.event, err)
+			f.pending = append(f.pending, loss{from: seq, to: seq, count: 1, bytes: uint64(e.bytes), channel: f.name, reason: "the event was refused as invalid: " + err.Error()})
 			return
 		}
 		f.batch = append(f.batch, line...)
@@ -713,10 +731,23 @@ func (l *Log) run(file *os.File, first *pendingEvent) {
 	}
 	// push stores an event. A file that this line would take past the bound is closed first; the new file opens with log.open
 	// and the record of the rotation, so every file of the contract starts with log.open and seq continues.
-	push := func(e *pendingEvent) {
+	var push func(e *pendingEvent)
+	push = func(e *pendingEvent) {
 		f := otherChannel
 		if e.level == LevelDebug || e.level == LevelTrace {
 			f = debugChannel
+		}
+		// The debug file is created before its first line is written, so a file that cannot be created holds no batch.
+		if f.file == nil {
+			opened, openErr := openFile(f.path, os.O_EXCL)
+			if openErr != nil {
+				// The event has no line; its seq stays taken, and a log.dropped in the main file names it.
+				fmt.Fprintf(os.Stderr, "event writer: the debug file could not be created: %v\n", openErr)
+				seq++
+				push(l.dropped(loss{from: seq, to: seq, count: 1, bytes: uint64(e.bytes), channel: f.name, reason: "the write failed: " + openErr.Error()}))
+				return
+			}
+			f.file = opened
 		}
 		begin(f)
 		line, err := eventLine(seq+1, e)
@@ -741,15 +772,6 @@ func (l *Log) run(file *os.File, first *pendingEvent) {
 				l.classify(f.rotated)
 				begin(f)
 			}
-		}
-		// The debug file is created with its first line of its channel.
-		if f.file == nil {
-			opened, openErr := openFile(f.path, os.O_EXCL)
-			if openErr != nil {
-				fmt.Fprintf(os.Stderr, "event writer: the debug file could not be created: %v\n", openErr)
-				return
-			}
-			f.file = opened
 		}
 		appendLine(f, e)
 	}
