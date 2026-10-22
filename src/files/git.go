@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
@@ -17,8 +18,13 @@ type GitEntry struct {
 	Status string `json:"status"`
 }
 
-// notRepository 는 git 이 저장소 밖에서 실행되었을 때의 종료 코드다.
+// notRepository 는 git 이 저장소 밖에서 실행되었을 때의 종료 코드다. git 은 다른 실패(예: 깨진 설정)에도 같은 코드를 쓰므로
+// 저장소 밖인지는 notRepositoryText 로 가린다.
 const notRepository = 128
+
+// notRepositoryText is the text that git prints on stderr when the directory is outside a repository. git runs with LC_ALL=C,
+// so the text is the English one whatever the locale of the process.
+const notRepositoryText = "not a git repository"
 
 // GitStatus 는 root 의 git 상태를 root 기준 경로로 반환한다. root 가 저장소 안에 있지 않거나 git 이
 // 설치되지 않았으면 빈 목록이다(docs/spec/sidecars.md#files). 다른 실패는 오류다.
@@ -29,8 +35,8 @@ func GitStatus(root string, trace Trace) ([]GitEntry, error) {
 	}
 	top, err := git(trace, base, "rev-parse", "--show-toplevel")
 	if err != nil {
-		var exit *exec.ExitError
-		if errors.Is(err, exec.ErrNotFound) || (errors.As(err, &exit) && exit.ExitCode() == notRepository) {
+		var failure *gitFailure
+		if errors.Is(err, exec.ErrNotFound) || (errors.As(err, &failure) && failure.code == notRepository && strings.Contains(failure.stderr, notRepositoryText)) {
 			return []GitEntry{}, nil
 		}
 		return nil, err
@@ -87,17 +93,35 @@ func statusOf(code string) string {
 	}
 }
 
+// gitFailure is a git call that exited with a status. stderr is the text that git printed, which tells the causes of one
+// status apart.
+type gitFailure struct {
+	code   int
+	stderr string
+	err    error
+}
+
+func (f *gitFailure) Error() string {
+	return fmt.Sprintf("%v: %s", f.err, f.stderr)
+}
+
+func (f *gitFailure) Unwrap() error {
+	return f.err
+}
+
 // git runs git in dir and stores the call as an event of trace.
 func git(trace Trace, dir string, args ...string) ([]byte, error) {
 	started := time.Now()
 	cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
+	cmd.Env = append(os.Environ(), "LC_ALL=C")
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
 	if err != nil {
 		var exit *exec.ExitError
 		if errors.As(err, &exit) {
-			err = fmt.Errorf("git %s: %w: %s", strings.Join(args, " "), err, strings.TrimSpace(stderr.String()))
+			failure := &gitFailure{code: exit.ExitCode(), stderr: strings.TrimSpace(stderr.String()), err: err}
+			err = fmt.Errorf("git %s: %w", strings.Join(args, " "), failure)
 			trace.git(strings.Join(args, " "), exit.ExitCode(), started, err)
 		} else {
 			trace.git(strings.Join(args, " "), internalCode, started, err)

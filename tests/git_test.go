@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -66,5 +67,29 @@ func TestGitOutsideARepositoryReportsNoEntries(t *testing.T) {
 	events := serve(t, gitRequest(t, root))
 	if got, _ := json.Marshal(events[0].Body); string(got) != `{"id":"g","entries":[]}` {
 		t.Fatalf("git = %s", got)
+	}
+}
+
+// A git failure with status 128 that is not a missing repository is an error that keeps the text of git. A broken
+// configuration of a repository makes git stop with status 128 inside the repository.
+func TestGitFailureWithStatus128IsAnErrorWithItsText(t *testing.T) {
+	repo := t.TempDir()
+	run(t, repo, "init", "-q")
+	config, err := os.OpenFile(filepath.Join(repo, ".git", "config"), os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := config.WriteString("[[[ bad\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := config.Close(); err != nil {
+		t.Fatal(err)
+	}
+	events := serve(t, gitRequest(t, repo))
+	if len(events) != 1 || events[0].Body == nil {
+		t.Fatalf("events = %+v", events)
+	}
+	if body := events[0].Body; body.Error == "" || !strings.Contains(body.Error, "bad config line") || body.Entries != nil {
+		t.Fatalf("the reply is %+v, want the error of git", *body)
 	}
 }
