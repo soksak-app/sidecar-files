@@ -349,3 +349,82 @@ func TestExpandedDirectoryRemovedByItsParentIsPrunedWithoutError(t *testing.T) {
 		t.Fatalf("rows after the removal = %#v, want none", rows)
 	}
 }
+
+// makeStatusesRoot builds a repository whose directories hold descendants with several statuses: deleted, renamed, added,
+// modified and untracked. Each directory has a different set, so each detail names the highest-ranked status of its set.
+func makeStatusesRoot(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	write := func(rel, text string) {
+		t.Helper()
+		path := filepath.Join(root, rel)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	git := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-C", root}, args...)...)
+		if output, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v: %s", args, err, output)
+		}
+	}
+	git("init", "-q")
+	for _, rel := range []string{"mixed/gone.go", "mixed/old.go", "mixed/kept.go", "ren/old.go", "addmod/kept.go"} {
+		write(rel, "before\n")
+	}
+	git("add", ".")
+	git("-c", "user.name=Files Test", "-c", "user.email=files@example.invalid", "commit", "-q", "-m", "base")
+	// mixed: deleted, renamed, added, modified and untracked.
+	if err := os.Remove(filepath.Join(root, "mixed", "gone.go")); err != nil {
+		t.Fatal(err)
+	}
+	git("mv", "mixed/old.go", "mixed/moved.go")
+	write("mixed/new.go", "added\n")
+	git("add", "mixed/new.go")
+	write("mixed/kept.go", "after\n")
+	write("mixed/loose.txt", "untracked\n")
+	// ren: renamed and untracked.
+	git("mv", "ren/old.go", "ren/moved.go")
+	write("ren/loose.txt", "untracked\n")
+	// addmod: modified and added.
+	write("addmod/kept.go", "after\n")
+	write("addmod/new.go", "added\n")
+	git("add", "addmod/new.go")
+	// addun: added and untracked.
+	write("addun/new.go", "added\n")
+	git("add", "addun/new.go")
+	write("addun/loose.txt", "untracked\n")
+	// untr: untracked only.
+	write("untr/loose.txt", "untracked\n")
+	return root
+}
+
+func TestDirectoryDetailFollowsTheRankOfItsDescendantStatuses(t *testing.T) {
+	const route = "plugin:files:project-a:@soksak/sidecar-files"
+	root := makeStatusesRoot(t)
+	events := serveTree(t, treeRequest(t, route, root, "snapshot", "s1", nil, nil))
+	if len(events) != 1 {
+		t.Fatalf("events = %#v", events)
+	}
+	rows := rowsOf(treeOf(t, events[0]))
+	want := map[string]string{
+		"mixed":  "deleted",
+		"ren":    "renamed",
+		"addmod": "modified",
+		"addun":  "added",
+		"untr":   "untracked",
+	}
+	for path, detail := range want {
+		row := rowOf(rows, path)
+		if row == nil {
+			t.Fatalf("directory %s is not listed: %#v", path, rows)
+		}
+		if row["detail"] != detail {
+			t.Fatalf("directory %s detail = %v, want %s", path, row["detail"], detail)
+		}
+	}
+}

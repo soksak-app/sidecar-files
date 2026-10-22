@@ -3,6 +3,7 @@
 [한국어](CHANGELOG.ko.md)
 
 ## Unreleased
+- S35: The tree test `TestDirectoryDetailFollowsTheRankOfItsDescendantStatuses` checks the directory detail against the rank of its descendant statuses (deleted, modified, added, renamed, untracked). The code matches the rank, so the test is a pin. A mutation that ranked `renamed` above `deleted` failed the test.
 - F238-d-16: add the host-read-only `snapshot`, `expand`, `collapse` and `select` tree operations. The sidecar owns the visible rows, per-path git details, selection, expanded directories and route generations; each reply carries a full snapshot and echoes the request `cids`. Closing a session, changing the root and restarting the process reset the matching in-memory route state.
 - S34: `TestWatchReportsAChangedFileContent` now runs on Linux as well as macOS; Linux execution and policy-reload validation remain pending.
 - S31: The process writes one record as its first action, before any setup: the text record `<UTC time> info sidecar files: started` on the standard error, which the host stores as a record of the layer `sidecar`, so the time from the spawn of the process to its first own record is visible. The record goes to the standard error and not to the event file, because the file of the contract starts with `log.open`. A clean run now writes exactly that record on its standard error.
