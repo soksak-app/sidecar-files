@@ -59,7 +59,26 @@ func sidecarBinary(t *testing.T) string {
 func runSidecar(t *testing.T, input string, args ...string) (string, int) {
 	t.Helper()
 	command := exec.Command(sidecarBinary(t), args...)
+	command.Env = append(command.Environ(), "SOKSAK_SIDECAR_DISPLAY_NAME=soksak://sidecar/files")
 	command.Stdin = strings.NewReader(input)
+	return runCommand(t, command)
+}
+
+func runSidecarWithoutDisplayName(t *testing.T, input string, args ...string) (string, int) {
+	t.Helper()
+	command := exec.Command(sidecarBinary(t), args...)
+	command.Env = make([]string, 0, len(command.Environ()))
+	for _, entry := range command.Environ() {
+		if !strings.HasPrefix(entry, "SOKSAK_SIDECAR_DISPLAY_NAME=") {
+			command.Env = append(command.Env, entry)
+		}
+	}
+	command.Stdin = strings.NewReader(input)
+	return runCommand(t, command)
+}
+
+func runCommand(t *testing.T, command *exec.Cmd) (string, int) {
+	t.Helper()
 	var stderr bytes.Buffer
 	command.Stderr = &stderr
 	err := command.Run()
@@ -134,6 +153,16 @@ func TestTheProcessStartsWithItsOwnRecord(t *testing.T) {
 	}
 	if opened := time.UnixMicro(open.TsMicros); opened.Before(at) {
 		t.Fatalf("log.open at %v precedes the start record at %v", opened, at)
+	}
+}
+
+func TestStartupRequiresTheProcessDisplayName(t *testing.T) {
+	stderr, status := runSidecarWithoutDisplayName(t, "")
+	if status != 1 || !strings.Contains(stderr, "SOKSAK_SIDECAR_DISPLAY_NAME") {
+		t.Fatalf("status %d, standard error %q; want startup failure naming SOKSAK_SIDECAR_DISPLAY_NAME", status, stderr)
+	}
+	if !strings.Contains(stderr, "info sidecar files: started") {
+		t.Fatalf("startup did not preserve its first process record before rejecting the missing display name: %q", stderr)
 	}
 }
 

@@ -18,6 +18,9 @@ type Platform interface {
 	// MonotonicNanos is the system-wide monotonic clock in nanoseconds that the events carry as mono_ns: CLOCK_UPTIME_RAW on
 	// macOS and CLOCK_MONOTONIC on Linux. It is comparable across the processes of one boot (core docs/spec/logging.md#event).
 	MonotonicNanos() (uint64, error)
+	// SetProcessDisplayName registers the current process with the requested display name on macOS. Other operating systems
+	// return an explicit not-implemented error; callers use this operation only on macOS.
+	SetProcessDisplayName(string) error
 }
 
 var (

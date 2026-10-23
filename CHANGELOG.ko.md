@@ -4,6 +4,8 @@
 
 ## 미배포
 
+- S41: files sidecar는 `sidecar.json.displayName`을 필수로 받고 `SOKSAK_SIDECAR_DISPLAY_NAME`으로 전달받아 첫 시작 기록을 유지한 채 runtime 초기화 전에 정확한 LaunchServices 이름을 등록한다. Red: 변경 전 진입점은 값이 없어도 시작했고 실제 child의 LaunchServices 항목도 없었다. Green: 두 owning test가 통과하고 scoped Go, manifest, records 검사와 macOS arm64의 local version 0.0.8 build가 통과한다.
+
 - S40: 잘못된 요청 줄은 거부되고 files sidecar는 계속 실행한다. surface를 밝히는 줄은 그 surface에 오류로 답하고, 읽을 수 있는 surface가 없는 줄은 기록한 뒤 건너뛴다. Red: `TestAnInvalidRequestIsRefusedAndTheSidecarKeepsRunning`이 첫 잘못된 줄에서 `serve: invalid request`로 실패했다. Green: 시험이 통과하고 다음 요청에 답한다.
 - S39: make-targets test는 자식 make의 환경에서 `MAKEFLAGS`와 `RANGE`를 뺀다. 그래서 pre-push 훅 안에서도 기본 범위를 출력한다. Red: `RANGE`를 설정하면 기본 범위 단정이 실패했다. Green: `RANGE`가 있을 때와 없을 때 모두 시험이 통과한다.
 - S38: pre-push 훅이 `make push-check`를 실행한다. 이것은 ci workflow와 같이 `make test`와 push 범위의 commit message 검사를 실행한다. Red: `tests/make-targets.test.mjs`가 없는 recipe와 없는 훅에서 실패했다. Green: 시험 2개 중 2개가 통과하고, `make push-check`가 통과한다.

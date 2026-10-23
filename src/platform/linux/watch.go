@@ -11,6 +11,10 @@ import (
 	"github.com/soksak-app/sidecar-files/src/routine"
 )
 
+func (implementation) SetProcessDisplayName(string) error {
+	return errors.New("not implemented on linux")
+}
+
 type implementation struct{}
 
 func init() { platform.Register(implementation{}) }

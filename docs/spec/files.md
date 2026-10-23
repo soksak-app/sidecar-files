@@ -5,6 +5,8 @@
 
 `@soksak/sidecar-files` (this repository) builds `build/soksak-files` with `make build` and lists and watches directories inside the session's `root`. Its code is in `src/`: the entry point `src/main.go`, the protocol in the package `src/files`, and directory watching in `src/platform/{darwin,linux,windows}/`, registered through `src/platform/platform.go`. macOS watches a directory or a regular file with a kqueue `EVFILT_VNODE` filter on it; Linux watches directories and regular files with inotify; Windows fails with `watching directories is not implemented on windows`. A session keeps only its watched paths. The sidecar reads request lines of up to 67108864 bytes, the limit of a sidecar output line, and writes replies without HTML escaping; an 8 MiB text escaped by JSON at most six times and the base64 of 32 MiB of bytes stay within that limit.
 
+The installed `sidecar.json` requires `displayName: "soksak://sidecar/files"`. The host passes that exact value as `SOKSAK_SIDECAR_DISPLAY_NAME`. The process writes its first start record before validating the environment or initializing the runtime. On macOS, it then registers the process with LaunchServices and verifies the exact display name; a missing value or registration error is reported on standard error and prevents runtime startup. The executable remains `build/soksak-files`.
+
 | Request body | Reply body |
 | --- | --- |
 | `{operation: "list", id, path}` | `{id, entries: [{name, directory}]}`: the entries of `root/path`, directories first, each group sorted by name; `path` is relative to `root`, `""` names `root` itself |

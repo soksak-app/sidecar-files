@@ -4,20 +4,30 @@
 GO_FLAGS ?=
 SOK ?= sok
 
+ifeq ($(shell uname -s),Darwin)
+PROCESS_IDENTITY_PKGCONFIG = $(shell node -e 'const path=require("node:path");const {createRequire}=require("node:module");const r=createRequire(path.join(process.cwd(),"package.json"));process.stdout.write(path.join(path.dirname(r.resolve("@soksak/native-process-identity-darwin/package.json")),"lib/pkgconfig"))')
+PROCESS_IDENTITY_ENV = PKG_CONFIG_PATH="$(PROCESS_IDENTITY_PKGCONFIG)$(if $(PKG_CONFIG_PATH),:$(PKG_CONFIG_PATH))"
+.PHONY: process-identity-check
+process-identity-check: node_modules
+	@node -e 'const fs=require("node:fs");const path=require("node:path");const {createRequire}=require("node:module");const r=createRequire(path.join(process.cwd(),"package.json"));const root=path.dirname(r.resolve("@soksak/native-process-identity-darwin/package.json"));for(const f of ["include/soksak_process_identity.h","lib/libsoksak-process-identity.a","lib/pkgconfig/soksak-process-identity.pc"]){if(!fs.existsSync(path.join(root,f)))throw new Error(`native process identity package is missing ${f}`)}'
+test: process-identity-check
+build: node_modules process-identity-check
+endif
+
 # node test 는 sidecar.json 을 package.json 이 정한 core commit 의 @soksak/plugin-api 로 검사하고, soksak-events 는 같은 commit 의 census 와 event 카탈로그 검사다.
 node_modules: package.json
 	pnpm install
 	touch node_modules
 
 test: node_modules
-	go test ./...
+	$(PROCESS_IDENTITY_ENV) go test ./...
 	node --test tests/
 	node_modules/.bin/soksak-events --census census.json --catalog events.json
 	node_modules/.bin/soksak-records
 
 # sidecar.json 이 가리키는 build/soksak-files 를 쓴다.
 build:
-	go build $(GO_FLAGS) -o build/soksak-files ./src
+	$(PROCESS_IDENTITY_ENV) go build $(GO_FLAGS) -o build/soksak-files ./src
 
 release: build
 	@test -n "$(OUT)" || { echo "make release OUT=<folder>" >&2; exit 2; }

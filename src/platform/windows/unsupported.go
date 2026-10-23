@@ -19,3 +19,7 @@ func (implementation) Watch(string, func(), func(error)) (func() error, error) {
 func (implementation) MonotonicNanos() (uint64, error) {
 	return 0, errors.New("the monotonic clock is not implemented on windows")
 }
+
+func (implementation) SetProcessDisplayName(string) error {
+	return errors.New("not implemented on windows")
+}

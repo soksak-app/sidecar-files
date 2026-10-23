@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+- S41: The files sidecar requires `sidecar.json.displayName`, receives it as `SOKSAK_SIDECAR_DISPLAY_NAME`, and registers the exact LaunchServices name before runtime initialization while retaining its first start record. Red: the unchanged entry point accepted a missing value, and a real child had no LaunchServices entry. Green: both owning tests pass; scoped Go, manifest, records checks and the local version 0.0.8 build pass on macOS arm64.
+
 - S40: An invalid request line is refused and the files sidecar keeps running: a line that names its surface is answered with its error on that surface, and a line without a readable surface is logged and skipped. Red: the test `TestAnInvalidRequestIsRefusedAndTheSidecarKeepsRunning` failed with `serve: invalid request` when the sidecar exited on the first invalid line. Green: the test passes and the next request is answered.
 - S39: The make-targets test clears `MAKEFLAGS` and `RANGE` from the environment of the child make, so the default range is printed inside the pre-push hook. Red: with `RANGE` set, the default range assertion failed. Green: the test passes with and without `RANGE`.
 - S38: The pre-push hook runs `make push-check`, which runs `make test` and the commit message check of the pushed range, as the ci workflow does. Red: `tests/make-targets.test.mjs` failed on the missing recipe and the missing hook. Green: 2 of 2 tests pass, and `make push-check` passes.
