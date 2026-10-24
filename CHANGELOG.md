@@ -4,6 +4,7 @@
 
 ## Unreleased
 
+- S42: The Files sidecar embeds `sidecar.json` and registers its declared process identity without reading a host environment variable. Red: the live-process test started the unchanged executable without that variable, which reported it as required and had no LaunchServices name. Green: the startup and live-process tests pass with the variable absent and with a conflicting value; `make test` passes, and the sidecar builds as a Mach-O arm64 executable on macOS arm64. No release was published.
 - S41: The files sidecar requires `sidecar.json.displayName`, receives it as `SOKSAK_SIDECAR_DISPLAY_NAME`, and registers the exact LaunchServices name before runtime initialization while retaining its first start record. Red: the unchanged entry point accepted a missing value, and a real child had no LaunchServices entry. Green: both owning tests pass; scoped Go, manifest, records checks and the local version 0.0.8 build pass on macOS arm64.
 
 - S40: An invalid request line is refused and the files sidecar keeps running: a line that names its surface is answered with its error on that surface, and a line without a readable surface is logged and skipped. Red: the test `TestAnInvalidRequestIsRefusedAndTheSidecarKeepsRunning` failed with `serve: invalid request` when the sidecar exited on the first invalid line. Green: the test passes and the next request is answered.

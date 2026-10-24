@@ -5,7 +5,7 @@
 
 `@soksak/sidecar-files`(이 저장소)는 `make build`로 `build/soksak-files`를 빌드하고 세션의 `root` 안의 디렉터리를 나열하고 감시한다. 코드는 `src/`에 있다: 진입점 `src/main.go`, 패키지 `src/files`의 프로토콜, `src/platform/platform.go`를 통해 등록되는 `src/platform/{darwin,linux,windows}/`의 디렉터리 감시. macOS는 디렉터리나 일반 파일에 kqueue `EVFILT_VNODE` 필터를 걸어 감시하고, Linux는 디렉터리와 일반 파일을 inotify로 감시하고, Windows는 `watching directories is not implemented on windows`로 실패한다. 세션은 감시하는 경로만 상태로 갖는다. 사이드카는 사이드카 출력 줄 한도와 같은 67108864 byte까지의 요청 줄을 읽고, 답을 HTML escape 없이 쓴다. JSON이 최대 여섯 배로 escape한 8 MiB 텍스트와 32 MiB bytes의 base64는 그 한도 안에 있다.
 
-설치된 `sidecar.json`은 `displayName: "soksak://sidecar/files"`를 요구한다. Host는 이 값을 그대로 `SOKSAK_SIDECAR_DISPLAY_NAME`으로 전달한다. process는 환경을 검증하거나 runtime을 초기화하기 전에 첫 시작 기록을 쓴다. macOS에서 그 뒤 LaunchServices에 process를 등록하고 정확한 display name인지 확인한다. 값이 없거나 등록이 실패하면 standard error에 보고하고 runtime 시작을 막는다. 실행 파일은 계속 `build/soksak-files`다.
+설치된 `sidecar.json`은 `displayName: "soksak://sidecar/files"`를 선언한다. Build는 이 선언을 `soksak-files`에 embed하고, sidecar는 embedded manifest 값을 읽으며 host 환경 변수에 의존하지 않는다. Process는 embedded 선언을 읽거나 runtime을 초기화하기 전에 첫 시작 기록을 쓴다. macOS에서 그 뒤 LaunchServices에 process를 등록하고 정확한 display name인지 확인한다. 선언이 없거나 등록이 실패하면 standard error에 보고하고 runtime 시작을 막는다. 실행 파일은 계속 `build/soksak-files`다.
 
 | 요청 본문 | 답 본문 |
 | --- | --- |

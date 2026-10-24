@@ -37,9 +37,9 @@ func run(args []string, in io.Reader, out, stderr io.Writer) int {
 	// not to the event file, because the file of the contract starts with log.open and the writer that writes it exists only
 	// after the setup reads the arguments and the platform.
 	fmt.Fprintf(stderr, "%s info sidecar files: started\n", time.Now().UTC().Format(recordTimeLayout))
-	displayName, present := os.LookupEnv("SOKSAK_SIDECAR_DISPLAY_NAME")
-	if !present {
-		fmt.Fprintln(stderr, "files sidecar: SOKSAK_SIDECAR_DISPLAY_NAME is required")
+	displayName, err := catalog.ProcessDisplayName()
+	if err != nil {
+		fmt.Fprintf(stderr, "files sidecar: process identity: %v\n", err)
 		return 1
 	}
 	if runtime.GOOS == "darwin" {

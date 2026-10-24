@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"strings"
 	"testing"
@@ -44,8 +45,19 @@ func launchServicesName(pid int) (string, bool, error) {
 }
 
 func TestLiveProcessUsesItsDeclaredLaunchServicesDisplayName(t *testing.T) {
+	testLiveProcessDisplayName(t, environmentWithoutDisplayName(os.Environ()))
+}
+
+func TestLiveProcessIgnoresHostDisplayNameEnvironment(t *testing.T) {
+	environment := environmentWithoutDisplayName(os.Environ())
+	environment = append(environment, "SOKSAK_SIDECAR_DISPLAY_NAME=soksak://sidecar/incorrect")
+	testLiveProcessDisplayName(t, environment)
+}
+
+func testLiveProcessDisplayName(t *testing.T, environment []string) {
+	t.Helper()
 	command := exec.Command(sidecarBinary(t))
-	command.Env = append(command.Environ(), "SOKSAK_SIDECAR_DISPLAY_NAME="+filesDisplayName)
+	command.Env = environment
 	command.Stdout = io.Discard
 	var stderr bytes.Buffer
 	command.Stderr = &stderr

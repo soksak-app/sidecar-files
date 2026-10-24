@@ -59,22 +59,19 @@ func sidecarBinary(t *testing.T) string {
 func runSidecar(t *testing.T, input string, args ...string) (string, int) {
 	t.Helper()
 	command := exec.Command(sidecarBinary(t), args...)
-	command.Env = append(command.Environ(), "SOKSAK_SIDECAR_DISPLAY_NAME=soksak://sidecar/files")
+	command.Env = environmentWithoutDisplayName(command.Environ())
 	command.Stdin = strings.NewReader(input)
 	return runCommand(t, command)
 }
 
-func runSidecarWithoutDisplayName(t *testing.T, input string, args ...string) (string, int) {
-	t.Helper()
-	command := exec.Command(sidecarBinary(t), args...)
-	command.Env = make([]string, 0, len(command.Environ()))
-	for _, entry := range command.Environ() {
+func environmentWithoutDisplayName(environment []string) []string {
+	filtered := make([]string, 0, len(environment))
+	for _, entry := range environment {
 		if !strings.HasPrefix(entry, "SOKSAK_SIDECAR_DISPLAY_NAME=") {
-			command.Env = append(command.Env, entry)
+			filtered = append(filtered, entry)
 		}
 	}
-	command.Stdin = strings.NewReader(input)
-	return runCommand(t, command)
+	return filtered
 }
 
 func runCommand(t *testing.T, command *exec.Cmd) (string, int) {
@@ -156,13 +153,15 @@ func TestTheProcessStartsWithItsOwnRecord(t *testing.T) {
 	}
 }
 
-func TestStartupRequiresTheProcessDisplayName(t *testing.T) {
-	stderr, status := runSidecarWithoutDisplayName(t, "")
-	if status != 1 || !strings.Contains(stderr, "SOKSAK_SIDECAR_DISPLAY_NAME") {
-		t.Fatalf("status %d, standard error %q; want startup failure naming SOKSAK_SIDECAR_DISPLAY_NAME", status, stderr)
+func TestStartupUsesTheEmbeddedProcessDisplayName(t *testing.T) {
+	folder := filepath.Join(t.TempDir(), "logs")
+	stderr, status := runSidecar(t, "", "--log-dir", folder)
+	if status != 0 {
+		t.Fatalf("status %d, standard error %q; want startup without a host display-name environment value", status, stderr)
 	}
-	if !strings.Contains(stderr, "info sidecar files: started") {
-		t.Fatalf("startup did not preserve its first process record before rejecting the missing display name: %q", stderr)
+	startRecord(t, stderr)
+	if find(onlyEventFile(t, folder), "log.open") == nil {
+		t.Fatal("the embedded identity did not allow runtime initialization")
 	}
 }
 

@@ -4,6 +4,7 @@
 
 ## 미배포
 
+- S42: Files sidecar는 `sidecar.json`을 embed하고 host 환경 변수를 읽지 않고 선언된 process identity를 등록한다. Red: 변경 전 executable을 변수 없이 시작하면 변수가 필수라고 보고하고 LaunchServices name을 등록하지 않았다. Green: 변수가 없거나 충돌 값이 있을 때의 startup/live-process test가 통과하고 `make test`와 macOS arm64의 Mach-O arm64 executable build가 통과한다. Release는 게시하지 않았다.
 - S41: files sidecar는 `sidecar.json.displayName`을 필수로 받고 `SOKSAK_SIDECAR_DISPLAY_NAME`으로 전달받아 첫 시작 기록을 유지한 채 runtime 초기화 전에 정확한 LaunchServices 이름을 등록한다. Red: 변경 전 진입점은 값이 없어도 시작했고 실제 child의 LaunchServices 항목도 없었다. Green: 두 owning test가 통과하고 scoped Go, manifest, records 검사와 macOS arm64의 local version 0.0.8 build가 통과한다.
 
 - S40: 잘못된 요청 줄은 거부되고 files sidecar는 계속 실행한다. surface를 밝히는 줄은 그 surface에 오류로 답하고, 읽을 수 있는 surface가 없는 줄은 기록한 뒤 건너뛴다. Red: `TestAnInvalidRequestIsRefusedAndTheSidecarKeepsRunning`이 첫 잘못된 줄에서 `serve: invalid request`로 실패했다. Green: 시험이 통과하고 다음 요청에 답한다.
