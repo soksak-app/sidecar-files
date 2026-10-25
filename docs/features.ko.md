@@ -2,6 +2,8 @@
 
 [English](features.md)
 
+- [~] F239-77-files-sidecar — P1, core F239-77 연결: Event name, class, level과 required/optional field 의미를 바꾸지 않고 sidecar event catalog를 schema 3 JSON Schema로 변환한다. Runtime acceptance에는 schema-3 core와 일치하는 package cohort 설치가 필요하다.
+
 - [o] S1 — P1: 이 sidecar를 자기 repository로 build, test, release한다. 2026-10-02에 soksak core repository(그곳의 checklist 항목 R1-5-2)에서 옮겼으며, 이전 변경 이력은 core에 있다. macOS arm64에서 `make test`, `make build`, `make release`가 통과한다.
 - [o] S2 — P1: soksak core 0.0.2에 대해 검사한다. 2026-10-02 완료: test가 core tag `v0.0.2`의 `@soksak/plugin-api`를 쓴다. Sidecar 자체는 0.0.1 그대로이고, macOS arm64에서 `make test`가 통과한다.
 - [o] S3 — P1: 공용 exposure 검사를 더한 commit으로 옮긴 core tag `v0.0.2`에 대해 검사한다(core R1-5-5). 2026-10-02 완료: lock 파일이 그 commit의 `@soksak/plugin-api`를 쓰고 macOS arm64에서 `make test`가 통과한다.

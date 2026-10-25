@@ -412,7 +412,12 @@ func TestARefusedEventIsCountedAndExplainedByLogDropped(t *testing.T) {
 func TestTheLogDroppedFieldsEqualTheCoreDeclaration(t *testing.T) {
 	var catalogText struct {
 		Events map[string]struct {
-			Fields map[string]string `json:"fields"`
+			Fields struct {
+				Properties map[string]struct {
+					Type string `json:"type"`
+				} `json:"properties"`
+				Required []string `json:"required"`
+			} `json:"fields"`
 		} `json:"events"`
 	}
 	if err := json.Unmarshal(catalog.Events, &catalogText); err != nil {
@@ -423,18 +428,23 @@ func TestTheLogDroppedFieldsEqualTheCoreDeclaration(t *testing.T) {
 		t.Fatal(err)
 	}
 	var golden struct {
-		Fields map[string]string `json:"fields"`
+		Fields struct {
+			Properties map[string]struct {
+				Type string `json:"type"`
+			} `json:"properties"`
+			Required []string `json:"required"`
+		} `json:"fields"`
 	}
 	if err := json.Unmarshal(text, &golden); err != nil {
 		t.Fatal(err)
 	}
 	declared := catalogText.Events["log.dropped"].Fields
-	if len(declared) != len(golden.Fields) {
+	if len(declared.Properties) != len(golden.Fields.Properties) || !slices.Equal(declared.Required, golden.Fields.Required) {
 		t.Fatalf("events.json declares %v for log.dropped, the core declaration is %v", declared, golden.Fields)
 	}
-	for name, kind := range golden.Fields {
-		if declared[name] != kind {
-			t.Fatalf("events.json declares %q as %q, the core declaration is %q", name, declared[name], kind)
+	for name, property := range golden.Fields.Properties {
+		if declaredProperty, ok := declared.Properties[name]; !ok || declaredProperty.Type != property.Type {
+			t.Fatalf("events.json declares %q as %q, the core declaration is %q", name, declaredProperty.Type, property.Type)
 		}
 	}
 }

@@ -1,5 +1,5 @@
 {
-  "schema": 2,
+  "schema": 3,
   "sidecar": "files",
   "layers": [
     "sidecar"
@@ -10,10 +10,28 @@
       "class": "lifecycle",
       "level": "info",
       "fields": {
-        "schema": "number",
-        "pid": "number",
-        "role": "string",
-        "boot": "string"
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "schema": {
+            "type": "number"
+          },
+          "pid": {
+            "type": "number"
+          },
+          "role": {
+            "type": "string"
+          },
+          "boot": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema",
+          "pid",
+          "role",
+          "boot"
+        ]
       },
       "description": "The first line of every event file."
     },
@@ -22,13 +40,39 @@
       "class": "lifecycle",
       "level": "warn",
       "fields": {
-        "from_seq": "number",
-        "to_seq": "number",
-        "count": "number",
-        "bytes": "number",
-        "reason": "string",
-        "channel": "string",
-        "queued?": "number"
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "from_seq": {
+            "type": "number"
+          },
+          "to_seq": {
+            "type": "number"
+          },
+          "count": {
+            "type": "number"
+          },
+          "bytes": {
+            "type": "number"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "channel": {
+            "type": "string"
+          },
+          "queued": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "from_seq",
+          "to_seq",
+          "count",
+          "bytes",
+          "reason",
+          "channel"
+        ]
       },
       "description": "A range of seq that the writer refused; it explains the gap. channel is other for the events of the levels error, warn and info and debug for the events of the levels debug and trace; it is stored in the main file. queued is the largest number of events that waited in the writer queue at a refusal that the record counts; it is absent for a loss that a source reports through the pull."
     },
@@ -37,8 +81,20 @@
       "class": "lifecycle",
       "level": "info",
       "fields": {
-        "bytes": "number",
-        "generation": "number"
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "bytes": {
+            "type": "number"
+          },
+          "generation": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "bytes",
+          "generation"
+        ]
       },
       "description": "A file was closed as the generation with this number and a new file started; no generation is removed."
     },
@@ -47,8 +103,20 @@
       "class": "lifecycle",
       "level": "info",
       "fields": {
-        "source": "string",
-        "classes": "object"
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "classes": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "source",
+          "classes"
+        ]
       },
       "description": "The policy of the event log that is now in force: source is default when no policy file exists and file when the policy file holds it; classes holds the least severe level that is stored for each class. The first policy of a writer and every change of it are stored; the same policy again is not."
     },
@@ -57,9 +125,24 @@
       "class": "lifecycle",
       "level": "info",
       "fields": {
-        "class": "string",
-        "level": "string",
-        "count": "number"
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "class": {
+            "type": "string"
+          },
+          "level": {
+            "type": "string"
+          },
+          "count": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "class",
+          "level",
+          "count"
+        ]
       },
       "description": "The number of events of the class and the level that the gate of the host refused since the earlier report, so no event is lost without a count."
     },
@@ -68,9 +151,24 @@
       "class": "lifecycle",
       "level": "info",
       "fields": {
-        "pid": "number",
-        "goos": "string",
-        "goarch": "string"
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "pid": {
+            "type": "number"
+          },
+          "goos": {
+            "type": "string"
+          },
+          "goarch": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "pid",
+          "goos",
+          "goarch"
+        ]
       },
       "description": "The sidecar started and reads requests."
     },
@@ -79,7 +177,16 @@
       "class": "lifecycle",
       "level": "info",
       "fields": {
-        "status": "number"
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "status"
+        ]
       },
       "description": "The sidecar ends with this exit status: 0 when its input closed, 1 for a failure."
     },
@@ -88,7 +195,16 @@
       "class": "lifecycle",
       "level": "error",
       "fields": {
-        "error": "string"
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ]
       },
       "description": "A failure ended the sidecar: a reply that cannot be written, or a read error."
     },
@@ -97,7 +213,16 @@
       "class": "lifecycle",
       "level": "error",
       "fields": {
-        "error": "string"
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ]
       },
       "description": "A request line was refused: it does not parse or names no surface. The sidecar answers a line that names its surface with the error, and keeps running."
     },
@@ -106,9 +231,24 @@
       "class": "lifecycle",
       "level": "error",
       "fields": {
-        "routine": "string",
-        "panic": "string",
-        "stack": "string"
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "routine": {
+            "type": "string"
+          },
+          "panic": {
+            "type": "string"
+          },
+          "stack": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "routine",
+          "panic",
+          "stack"
+        ]
       },
       "description": "A goroutine panicked; the process ends with status 2."
     },
@@ -121,15 +261,43 @@
       ],
       "result": true,
       "fields": {
-        "surface": "string",
-        "operation": "string",
-        "id?": "string",
-        "path?": "string",
-        "paths?": "array",
-        "generation?": "number",
-        "ok": "boolean",
-        "micros": "number",
-        "error?": "string"
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "surface": {
+            "type": "string"
+          },
+          "operation": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "paths": {
+            "type": "array"
+          },
+          "generation": {
+            "type": "number"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "micros": {
+            "type": "number"
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "surface",
+          "operation",
+          "ok",
+          "micros"
+        ]
       },
       "description": "A request was answered; the cids are those of the request line, and error names a failed request as <code>: <text>. The text of a write is not stored."
     },
@@ -138,8 +306,20 @@
       "class": "lifecycle",
       "level": "info",
       "fields": {
-        "surface": "string",
-        "path": "string"
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "surface": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "surface",
+          "path"
+        ]
       },
       "description": "A watch of a directory or a file started; path is relative to the project folder."
     },
@@ -148,8 +328,20 @@
       "class": "io",
       "level": "debug",
       "fields": {
-        "surface": "string",
-        "path": "string"
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "surface": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "surface",
+          "path"
+        ]
       },
       "description": "A watched directory or file changed and the sidecar reported it."
     },
@@ -158,9 +350,24 @@
       "class": "lifecycle",
       "level": "info",
       "fields": {
-        "surface": "string",
-        "path": "string",
-        "reason": "string"
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "surface": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "surface",
+          "path",
+          "reason"
+        ]
       },
       "description": "A watch ended; reason is replaced, closed, input closed or start failed."
     },
@@ -169,9 +376,24 @@
       "class": "lifecycle",
       "level": "error",
       "fields": {
-        "surface": "string",
-        "path": "string",
-        "error": "string"
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "surface": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "surface",
+          "path",
+          "error"
+        ]
       },
       "description": "A watch failed on its own or did not stop; the sidecar reported the error to the surface."
     },
@@ -184,11 +406,31 @@
       ],
       "result": true,
       "fields": {
-        "surface": "string",
-        "args": "string",
-        "ok": "boolean",
-        "micros": "number",
-        "error?": "string"
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "surface": {
+            "type": "string"
+          },
+          "args": {
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "micros": {
+            "type": "number"
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "surface",
+          "args",
+          "ok",
+          "micros"
+        ]
       },
       "description": "One call of git; error is the exit status of git as the code. A folder outside a repository answers 128, which the request reports as an empty status."
     }

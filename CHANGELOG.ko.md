@@ -4,6 +4,13 @@
 
 ## 미배포
 
+- F239-77-files-sidecar: Sidecar event catalog를 schema 3 JSON Schema로
+  변환하면서 event name, class, level과 field 요구사항을 유지한다. Red: 현재
+  core reader가 schema-2 및 compact-field 문제를 보고했다. Green: current-core
+  catalog 보고에서 declaration 16개와 emit site 18개에 finding이 없고 focused
+  class 및 field-shape Go test 2개가 통과한다. Runtime acceptance에는 schema-3
+  core와 package cohort의 새 설치가 필요하다.
+
 - S42: Files sidecar는 `sidecar.json`을 embed하고 host 환경 변수를 읽지 않고 선언된 process identity를 등록한다. Red: 변경 전 executable을 변수 없이 시작하면 변수가 필수라고 보고하고 LaunchServices name을 등록하지 않았다. Green: 변수가 없거나 충돌 값이 있을 때의 startup/live-process test가 통과하고 `make test`와 macOS arm64의 Mach-O arm64 executable build가 통과한다. Release는 게시하지 않았다.
 - S41: files sidecar는 `sidecar.json.displayName`을 필수로 받고 `SOKSAK_SIDECAR_DISPLAY_NAME`으로 전달받아 첫 시작 기록을 유지한 채 runtime 초기화 전에 정확한 LaunchServices 이름을 등록한다. Red: 변경 전 진입점은 값이 없어도 시작했고 실제 child의 LaunchServices 항목도 없었다. Green: 두 owning test가 통과하고 scoped Go, manifest, records 검사와 macOS arm64의 local version 0.0.8 build가 통과한다.
 

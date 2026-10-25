@@ -4,6 +4,14 @@
 
 ## Unreleased
 
+- F239-77-files-sidecar: Convert the sidecar event catalog to schema 3 JSON
+  Schema while preserving event names, classes, levels and field requirements.
+  Red: the current core reader reported schema-2 and compact-field findings.
+  Green: current-core catalog reporting has zero findings for 16 declarations
+  and 18 emit sites; the focused class and field-shape Go tests pass 2/2.
+  Runtime acceptance requires a fresh install with the schema-3 core and package
+  cohort.
+
 - S42: The Files sidecar embeds `sidecar.json` and registers its declared process identity without reading a host environment variable. Red: the live-process test started the unchanged executable without that variable, which reported it as required and had no LaunchServices name. Green: the startup and live-process tests pass with the variable absent and with a conflicting value; `make test` passes, and the sidecar builds as a Mach-O arm64 executable on macOS arm64. No release was published.
 - S41: The files sidecar requires `sidecar.json.displayName`, receives it as `SOKSAK_SIDECAR_DISPLAY_NAME`, and registers the exact LaunchServices name before runtime initialization while retaining its first start record. Red: the unchanged entry point accepted a missing value, and a real child had no LaunchServices entry. Green: both owning tests pass; scoped Go, manifest, records checks and the local version 0.0.8 build pass on macOS arm64.
 
