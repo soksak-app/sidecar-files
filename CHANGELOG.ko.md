@@ -4,6 +4,8 @@
 
 ## 미배포
 
+- F239-77-files-sidecar: 일치하는 설치 diagnostic cohort로 로컬 schema-3 catalog acceptance를 완료한다. 현재 SDK가 source 22개와 pending rule 0개, event 16개를 검사하며 양쪽 host 설치본의 catalog가 source와 정확히 일치하고 application log audit을 통과한다. Public publication은 별도다.
+
 - F239-77-files-sidecar: Sidecar event catalog를 schema 3 JSON Schema로
   변환하면서 event name, class, level과 field 요구사항을 유지한다. Red: 현재
   core reader가 schema-2 및 compact-field 문제를 보고했다. Green: current-core

@@ -2,7 +2,7 @@
 
 [한국어](features.ko.md)
 
-- [~] F239-77-files-sidecar — P1, linked to core F239-77: Convert this sidecar event catalog to schema 3 JSON Schema without changing event names, classes, levels, or required/optional field semantics. Runtime acceptance requires installation with the schema-3 core and matching package cohort.
+- [o] F239-77-files-sidecar — P1, linked to core F239-77: Convert the event catalog to schema 3 JSON Schema while preserving event names, classes, levels and required/optional field semantics. Current public SDK census and catalog commands pass: 22 implementation sources, zero pending rules and 16 declared events. The source catalog is byte-identical to both freshly installed diagnostic host configurations. Normal CLI installation and application log audits accept the matching core/plugin/sidecar cohort. This closes the catalog migration unit only; public publication and unrelated historical behavior findings remain separate. The older installed SDK command rejects schema 3 and is not recorded as passing.
 
 - [o] S1 — P1: Build, test and release this sidecar as its own repository. Moved on 2026-10-02 from the soksak core repository (checklist item R1-5-2 there), whose history holds the earlier changes. `make test`, `make build` and `make release` pass on macOS arm64.
 - [o] S2 — P1: Test against soksak core 0.0.2. Done on 2026-10-02: the tests resolve `@soksak/plugin-api` from the core tag `v0.0.2`; the sidecar itself is unchanged at 0.0.1, and `make test` passes on macOS arm64.

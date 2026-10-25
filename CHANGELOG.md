@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+- F239-77-files-sidecar: Complete local schema-3 catalog acceptance with the matching installed diagnostic cohort. The current SDK checks 22 sources with zero pending rules and 16 events; both host installations contain the exact source catalog and pass application log audits. Public publication remains separate.
+
 - F239-77-files-sidecar: Convert the sidecar event catalog to schema 3 JSON
   Schema while preserving event names, classes, levels and field requirements.
   Red: the current core reader reported schema-2 and compact-field findings.
