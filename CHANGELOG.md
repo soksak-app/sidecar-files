@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+- S41-2: Verify the installed Darwin native process-identity package through public package resolution and its build files. The owning consumer passes and the standard sidecar build succeeds on macOS arm64. Replace the remote-install fixture that omitted local overrides; keep local workspace/lock overrides uncommitted and external Git-ref installation acceptance open under S41-1.
+
 - F239-77-files-sidecar: Complete local schema-3 catalog acceptance with the matching installed diagnostic cohort. The current SDK checks 22 sources with zero pending rules and 16 events; both host installations contain the exact source catalog and pass application log audits. Public publication remains separate.
 
 - F239-77-files-sidecar: Convert the sidecar event catalog to schema 3 JSON
