@@ -4,6 +4,15 @@
 
 ## 미배포
 
+- S43: Plugin API와 Darwin process-identity package를 동일한 fetch 가능한 public
+  core commit에 고정하고 release CLI build도 그 ref를 사용한다. 정규 lock은 두
+  package를 version 0.0.21로 resolve한다. Red: 변경 전 manifest consumer는 현재
+  SDK validator를 호출하기 전에 필수 `displayName`을 제거했다. Green: consumer가
+  전체 `sidecar.json`을 검증하고 manifest owner와 developer-link native-package
+  consumer가 각각 1/1 통과하며 SDK event census/catalog 검사는 source 22개와
+  event 16개에서 통과한다. 외부 frozen install과 Darwin package build는 S41-1에
+  남아 있다. Public v0.0.8은 아직 게시되지 않았다.
+
 - S41-2: 공개 package resolution과 build file로 설치된 Darwin native process-identity package를 검증한다. 소유 consumer 검사와 macOS arm64의 표준 sidecar build가 통과한다. 로컬 override를 누락한 remote-install fixture를 대체하며 로컬 workspace/lock override는 commit하지 않고 외부 Git-ref 설치 acceptance는 S41-1에 유지한다.
 
 - F239-77-files-sidecar: 일치하는 설치 diagnostic cohort로 로컬 schema-3 catalog acceptance를 완료한다. 현재 SDK가 source 22개와 pending rule 0개, event 16개를 검사하며 양쪽 host 설치본의 catalog가 source와 정확히 일치하고 application log audit을 통과한다. Public publication은 별도다.
