@@ -4,6 +4,14 @@
 
 ## Unreleased
 
+- S44: Approve only the native process-identity Git dependency build in the
+  tracked pnpm workspace policy. Red: without approval, a clean frozen install
+  omitted the optional package payload and the Files consumer failed with
+  `MODULE_NOT_FOUND`. Green: the approved install ran `prepare: make`; the
+  consumer passed 1/1 and found the header (526 bytes), static library
+  (3568 bytes) and pkg-config file (337 bytes). The Darwin sidecar package
+  build remains open under S41-1.
+
 - S43: Pin the plugin API and Darwin process-identity package to the same
   fetchable public core commit and use it for the release CLI build. The
   canonical lock resolves both as version 0.0.21. Red: the unchanged manifest

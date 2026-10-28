@@ -4,6 +4,13 @@
 
 ## 미배포
 
+- S44: Tracked pnpm workspace policy에서 native process-identity Git
+  dependency build만 승인한다. Red: 승인 없는 clean frozen install이 optional
+  package payload를 제외해 Files consumer가 `MODULE_NOT_FOUND`로 실패한다.
+  Green: 승인된 install이 `prepare: make`를 실행했고 consumer 1/1이 통과하며
+  header (526 bytes), static library (3568 bytes), pkg-config file (337 bytes)를
+  확인한다. Darwin sidecar package build는 S41-1에서 계속 확인한다.
+
 - S43: Plugin API와 Darwin process-identity package를 동일한 fetch 가능한 public
   core commit에 고정하고 release CLI build도 그 ref를 사용한다. 정규 lock은 두
   package를 version 0.0.21로 resolve한다. Red: 변경 전 manifest consumer는 현재
