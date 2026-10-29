@@ -2,6 +2,7 @@
 
 [English](features.md)
 
+- [ ] F272-files-sidecar — P1, core F272 연결: 이 저장소를 green인 `main`에서 release한다. 기대: `release.yml`은 `main` push로 시작해 `ci.yml`을 호출하고 `@soksak/plugin-api`의 `soksak-release-gate package.json docs/features.md`를 실행한다. 이 도구는 원격에 tag가 없고 `[ ]`, `[~]`, `[!]` 항목이 없을 때 `package.json`가 선언한 version을 release한다. release job은 run commit이 `main` head이고 tag가 없음을 요구하며, release와 함께 `v<version>`을 만든다. core `docs/spec/plugins.md`는 `@soksak/plugin-api`를 core release tag에 pin하고, `soksak-release-gate`는 core F272를 실은 core release에 처음 실린다. 이 변경은 pin을 그 tag로 옮기고 workflow를 한 commit에서 바꾼다. 그때까지 `release.yml`은 push된 `v*` tag로 release한다.
 - [o] F239-77-files-sidecar — P1, core F239-77 연결: Event 이름, class, level 및 required/optional field 의미를 보존하며 event catalog를 schema 3 JSON Schema로 전환한다. 현재 공개 SDK census 및 catalog 명령이 implementation source 22개, pending rule 0개, 선언 event 16개로 통과한다. Source catalog는 새로 설치한 양쪽 diagnostic host configuration과 byte 단위로 일치한다. 일반 CLI 설치와 application log audit이 일치하는 core/plugin/sidecar cohort를 받아들인다. Catalog migration 단위만 완료하며 public publication과 관련 없는 과거 동작 추적은 별도다. 예전 설치 SDK 명령은 schema 3을 거절하며 통과로 기록하지 않는다.
 
 - [o] S1 — P1: 이 sidecar를 자기 repository로 build, test, release한다. 2026-10-02에 soksak core repository(그곳의 checklist 항목 R1-5-2)에서 옮겼으며, 이전 변경 이력은 core에 있다. macOS arm64에서 `make test`, `make build`, `make release`가 통과한다.
