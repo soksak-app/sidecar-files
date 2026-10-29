@@ -4,6 +4,7 @@
 
 ## 미배포
 
+- F275-files-sidecar: `make install`이 고정된 의존성을 설치한다. 시험, 검사, build는 더 이상 설치하지 않는다.
 - F274-1-files-sidecar: make target 시험은 중첩된 make의 directory 줄 없이 recipe를 출력한다.
 - F274-files-sidecar: pre-push hook은 push가 게시하는 commit message만 검사한다. 시험과 검사는 CI가 실행한다.
 - S44: Tracked pnpm workspace policy에서 native process-identity Git

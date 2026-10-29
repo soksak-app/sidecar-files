@@ -4,6 +4,7 @@
 
 ## Unreleased
 
+- F275-files-sidecar: `make install` installs the locked dependencies; the tests, checks and builds no longer install.
 - F274-1-files-sidecar: The make target test prints a recipe without the directory lines of a nested make.
 - F274-files-sidecar: The pre-push hook checks only the commit messages that a push publishes; CI runs the tests and checks.
 - S44: Approve only the native process-identity Git dependency build in the
