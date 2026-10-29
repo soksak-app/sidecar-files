@@ -19,10 +19,10 @@ function recipe(target) {
   return result.stdout;
 }
 
-test("make push-check runs the Go and Node tests and the commit message check of the pushed range (S38)", { timeout: 30000 }, () => {
+// A published commit message is kept, so the push checks it; CI runs the tests on the pushed commits.
+test("make push-check runs only the commit message check of the pushed range (F274-files-sidecar)", { timeout: 30000 }, () => {
   const commands = recipe("push-check");
-  assert.match(commands, /go test \.\/\.\.\./);
-  assert.match(commands, /pnpm exec soksak-commits "origin\/main\.\.HEAD"/);
+  assert.deepEqual(commands.trim().split("\n"), ['pnpm exec soksak-commits "origin/main..HEAD"']);
 });
 
 test("the pre-push hook runs make push-check on the pushed range (S38)", { timeout: 30000 }, () => {

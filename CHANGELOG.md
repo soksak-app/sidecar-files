@@ -4,6 +4,7 @@
 
 ## Unreleased
 
+- F274-files-sidecar: The pre-push hook checks only the commit messages that a push publishes; CI runs the tests and checks.
 - S44: Approve only the native process-identity Git dependency build in the
   tracked pnpm workspace policy. Red: without approval, a clean frozen install
   omitted the optional package payload and the Files consumer failed with

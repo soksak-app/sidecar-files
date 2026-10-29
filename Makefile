@@ -33,9 +33,10 @@ release: build
 	@test -n "$(OUT)" || { echo "make release OUT=<folder>" >&2; exit 2; }
 	$(SOK) sidecar release . $(OUT)
 
-# The checks that a push needs: make test, then the commit messages of the pushed range.
+# The check that a push needs: the commit messages of the pushed range, because a published commit message is kept; CI runs
+# the tests and checks on the pushed commits.
 # RANGE holds the commits of the pushed refs; the pre-push hook sets it, and it defaults to origin/main..HEAD.
-push-check: test
+push-check:
 	pnpm exec soksak-commits "$(or $(RANGE),origin/main..HEAD)"
 
 # Sets this repository to use .githooks, which checks commit messages and records at commit time.

@@ -4,6 +4,7 @@
 
 ## 미배포
 
+- F274-files-sidecar: pre-push hook은 push가 게시하는 commit message만 검사한다. 시험과 검사는 CI가 실행한다.
 - S44: Tracked pnpm workspace policy에서 native process-identity Git
   dependency build만 승인한다. Red: 승인 없는 clean frozen install이 optional
   package payload를 제외해 Files consumer가 `MODULE_NOT_FOUND`로 실패한다.
