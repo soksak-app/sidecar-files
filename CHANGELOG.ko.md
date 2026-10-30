@@ -4,6 +4,7 @@
 
 ## 미배포
 
+- S46: sidecar는 process identity package가 process를 display name과 함께 등록하는 core revision에 고정되므로, LaunchServices는 첫 목록부터 sidecar를 display name으로 보여 준다.
 - S41-1: `ci.yml`의 macOS runner에서 fresh frozen install이 pin한 native process-identity Git dependency를 resolve하고 그 `prepare`를 실행하며, 사이드카가 그것으로 build되고 test를 통과한다.
 - S7: CI와 release workflow가 완료되었다. `release.yml`이 tag에서 release `v0.0.3`부터 `v0.0.6`까지 게시했고, `ci.yml`이 macOS와 Linux에서 `main`을 시험한다.
 - S13: S18.5.2가 요구하는 대로 Linux에서 감시하는 정규 파일은 지원하는 감시이며 구현하지 않은 연산이 아니다. S34의 Linux 실행이 이를 확인한다.

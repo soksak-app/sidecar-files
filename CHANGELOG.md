@@ -4,6 +4,7 @@
 
 ## Unreleased
 
+- S46: The sidecar pins the core revision whose process identity package registers the process with its display name, so LaunchServices lists the sidecar with its display name from its first listing.
 - S41-1: A fresh frozen install on the macOS runner of `ci.yml` resolves the pinned native process-identity Git dependency, runs its `prepare`, and the sidecar builds and passes its tests with it.
 - S7: The CI and release workflows are complete: `release.yml` published the releases `v0.0.3` to `v0.0.6` from their tags, and `ci.yml` tests `main` on macOS and Linux.
 - S13: A watched regular file on Linux is a supported watch, as S18.5.2 requires, and not an unimplemented operation; the Linux run of S34 confirms it.
