@@ -10,7 +10,7 @@
 | 요청 본문 | 답 본문 |
 | --- | --- |
 | `{operation: "list", id, path}` | `{id, entries: [{name, directory}]}`: `root/path`의 항목. 디렉터리가 먼저 오고 각 묶음은 이름순이다. `path`는 `root` 기준 상대 경로이며 `""`는 `root` 자신이다 |
-| `{operation: "watch", id, paths}` | `{id}`: 세션이 감시하는 경로를 `paths`(`root` 기준 상대 경로, `list`와 같이 검사)로 바꾼다. 빈 목록은 감시를 멈춘다. 그 뒤 감시하는 디렉터리의 항목이 생기거나 지워지거나 이름이 바뀔 때와, 감시하는 일반 파일의 내용이 쓰이거나 늘어날 때(macOS 파일의 kqueue `NOTE_WRITE`나 `NOTE_EXTEND`; Linux 파일의 inotify 쓰기, 삭제, 이동 event) 사이드카는 `id` 없이 `{changed: path}`를 보낸다 |
+| `{operation: "watch", id, paths}` | `{id}`: 세션이 감시하는 경로를 `paths`(`root` 기준 상대 경로, `list`와 같이 검사)로 바꾼다. 빈 목록은 감시를 멈춘다. 그 뒤 감시하는 디렉터리의 항목이 생기거나 지워지거나 이름이 바뀔 때와, 감시하는 일반 파일의 내용이 쓰이거나 늘어날 때(macOS 파일의 kqueue `NOTE_WRITE`나 `NOTE_EXTEND`; Linux 파일의 inotify 쓰기, 삭제, 이동 event) 사이드카는 `id` 없이 `{changed: path}`를 보낸다. 시작한 감시가 실패하거나, input이 닫힐 때 감시가 멈추지 않으면 사이드카는 `id` 없이 `{error: text}`를 보낸다. 이 message는 어떤 요청에도 답하지 않는다 |
 | `{operation: "snapshot", id}` | `{id, tree: {generation, entries, selected}}`: 이 sidecar session과 project root의 표시 트리 전체. project root는 generation 1에서 펼쳐지고 처음에는 선택이 없다 |
 | `{operation: "expand", id, generation, path}` | `{id, tree: {generation, entries, selected}}`: `path`의 나열된 디렉터리를 펼쳐 자식을 나열하고 펼친 모든 디렉터리를 감시한다 |
 | `{operation: "collapse", id, generation, path}` | `{id, tree: {generation, entries, selected}}`: 디렉터리와 펼친 자손을 접고 보이는 행을 제거하며 접힌 디렉터리 안의 선택을 지운다 |
