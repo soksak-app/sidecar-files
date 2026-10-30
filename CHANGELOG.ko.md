@@ -4,6 +4,7 @@
 
 ## 미배포
 
+- S34: `TestWatchReportsAChangedFileContent`와 정책 reload test가 `ci.yml`의 `test-linux` job(`ubuntu-26.04-arm`)에서 Linux로 통과한다.
 - S45: `watch`의 명세가 시작한 감시가 실패하거나 input이 닫힐 때 멈추지 않으면 사이드카가 보내는 `id` 없는 `{error: text}` message를 적는다.
 - F275-files-sidecar: `make install`이 고정된 의존성을 설치한다. 시험, 검사, build는 더 이상 설치하지 않는다.
 - F274-1-files-sidecar: make target 시험은 중첩된 make의 directory 줄 없이 recipe를 출력한다.

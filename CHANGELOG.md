@@ -4,6 +4,7 @@
 
 ## Unreleased
 
+- S34: `TestWatchReportsAChangedFileContent` and the policy reload tests pass on Linux in the `test-linux` job of `ci.yml` (`ubuntu-26.04-arm`).
 - S45: The specification of `watch` states the message `{error: text}` without `id` that the sidecar sends when a watch fails after it started or does not stop as the input closes.
 - F275-files-sidecar: `make install` installs the locked dependencies; the tests, checks and builds no longer install.
 - F274-1-files-sidecar: The make target test prints a recipe without the directory lines of a nested make.
