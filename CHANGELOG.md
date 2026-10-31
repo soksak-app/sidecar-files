@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+- S47: Version 0.0.8 requires core 0.0.21. On core 0.0.20 a fresh selection of this version fails with `sidecar.json: unknown field displayName`, because that core reads only the earlier fields of `sidecar.json`; an installation that already uses an earlier version keeps it. A core 0.0.20 installation updates the application to 0.0.21 first.
+
 - S46: The sidecar pins the core revision whose process identity package registers the process with its display name, so LaunchServices lists the sidecar with its display name from its first listing.
 - S41-1: A fresh frozen install on the macOS runner of `ci.yml` resolves the pinned native process-identity Git dependency, runs its `prepare`, and the sidecar builds and passes its tests with it.
 - S7: The CI and release workflows are complete: `release.yml` published the releases `v0.0.3` to `v0.0.6` from their tags, and `ci.yml` tests `main` on macOS and Linux.
