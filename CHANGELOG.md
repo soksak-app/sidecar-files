@@ -4,6 +4,7 @@
 
 ## Unreleased
 
+- S49: Version 0.0.9 carries S48.
 - S48: `sidecar.json` declares no `hostReadOperations`, which core refuses from the release that holds F332-4-7.
 - S37: v0.0.8 is published and the registry lists it.
 - F272-files-sidecar: A push to `main` releases the declared version through `soksak-release-gate` when its tag is absent, with the `sok` of the core release `v0.0.21`, and the dependencies on core are the packed release files of that release; no workflow checks out core.

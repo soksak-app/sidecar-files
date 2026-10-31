@@ -4,6 +4,7 @@
 
 ## 미배포
 
+- S49: 0.0.9판은 S48을 담는다.
 - S48: `sidecar.json`은 `hostReadOperations`를 선언하지 않는다. core는 F332-4-7을 담은 release부터 그 member를 거부한다.
 - S37: v0.0.8이 게시되었고 registry가 이를 올린다.
 - F272-files-sidecar: `main`에 push하면 tag가 없을 때 `soksak-release-gate`로 선언된 version을 core release `v0.0.21`의 `sok`와 함께 release한다. core에 대한 의존은 그 release의 pack된 release 파일이다. 어떤 workflow도 core를 checkout하지 않는다.
