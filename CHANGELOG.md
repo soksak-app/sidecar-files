@@ -4,6 +4,7 @@
 
 ## Unreleased
 
+- S37: v0.0.8 is published and the registry lists it.
 - F272-files-sidecar: A push to `main` releases the declared version through `soksak-release-gate` when its tag is absent, with the `sok` of the core release `v0.0.21`, and the dependencies on core are the packed release files of that release; no workflow checks out core.
 - S47: Version 0.0.8 requires core 0.0.21. On core 0.0.20 a fresh selection of this version fails with `sidecar.json: unknown field displayName`, because that core reads only the earlier fields of `sidecar.json`; an installation that already uses an earlier version keeps it. A core 0.0.20 installation updates the application to 0.0.21 first.
 
