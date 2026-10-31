@@ -16,9 +16,9 @@
     "build/soksak-files"
   ],
   "devDependencies": {
-    "@soksak/plugin-api": "git+https://github.com/soksak-app/core.git#8701f98b2a981f9f78b542008dc9b89b2719b0fa&path:/packages/plugin-api"
+    "@soksak/plugin-api": "https://github.com/soksak-app/core/releases/download/v0.0.21/soksak-plugin-api-0.0.21.tgz"
   },
   "optionalDependencies": {
-    "@soksak/native-process-identity-darwin": "git+https://github.com/soksak-app/core.git#8701f98b2a981f9f78b542008dc9b89b2719b0fa&path:/native/darwin/process-identity"
+    "@soksak/native-process-identity-darwin": "https://github.com/soksak-app/core/releases/download/v0.0.21/soksak-native-process-identity-darwin-0.0.21.tgz"
   }
 }

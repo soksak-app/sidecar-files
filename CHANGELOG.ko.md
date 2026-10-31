@@ -4,6 +4,7 @@
 
 ## 미배포
 
+- F272-files-sidecar: `main`에 push하면 tag가 없을 때 `soksak-release-gate`로 선언된 version을 core release `v0.0.21`의 `sok`와 함께 release한다. core에 대한 의존은 그 release의 pack된 release 파일이다. 어떤 workflow도 core를 checkout하지 않는다.
 - S47: 0.0.8판은 core 0.0.21이 필요하다. core 0.0.20에서 이 판을 새로 선택하면 `sidecar.json: unknown field displayName`으로 실패한다. 그 core는 `sidecar.json`의 이전 필드만 읽기 때문이다. 이전 판을 이미 쓰는 설치는 그것을 유지한다. core 0.0.20 설치는 먼저 앱을 0.0.21로 갱신한다.
 
 - S46: sidecar는 process identity package가 process를 display name과 함께 등록하는 core revision에 고정되므로, LaunchServices는 첫 목록부터 sidecar를 display name으로 보여 준다.

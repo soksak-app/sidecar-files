@@ -1,2 +1,0 @@
-allowBuilds:
-  '@soksak/native-process-identity-darwin@git+https://github.com/soksak-app/core.git': true

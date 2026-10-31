@@ -2,9 +2,9 @@ name: ci
 # build-machine: skip build reason=the release workflow builds the sidecar; make test builds what the tests run
 # build-machine: skip smoke reason=the sidecar has no application to start; its protocol tests run the binary
 
+# release.yml calls this workflow on each push to main, so a push runs the checks once.
 on:
-  push:
-    branches: [main]
+  workflow_call:
   pull_request:
 
 jobs:
