@@ -9,9 +9,9 @@ test("sidecar.json satisfies the sidecar format and the package publishes its ex
   const declared = read("sidecar.json");
   const sidecar = validateSidecar(declared);
   assert.deepEqual(sidecar.message, { form: "json-object", operationField: "operation" });
-  assert.deepEqual(sidecar.hostReadOperations, ["snapshot", "expand", "collapse", "select"]);
+  // Core refuses hostReadOperations, which only its removed plugin host read.
+  assert.equal(Object.hasOwn(declared, "hostReadOperations"), false);
   assert.equal(sidecar.displayName, "soksak://sidecar/files");
-  assert.ok(sidecar.hostReadOperations.every((operation) => /^[a-z][a-z0-9]*$/.test(operation)));
   const pkg = read("package.json");
   assert.ok(pkg.files.includes("sidecar.json"));
   assert.ok(pkg.files.includes(sidecar.executable));

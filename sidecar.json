@@ -3,6 +3,5 @@
   "displayName": "soksak://sidecar/files",
   "protocol": 1,
   "message": { "form": "json-object", "operationField": "operation" },
-  "hostReadOperations": ["snapshot", "expand", "collapse", "select"],
   "events": "events.json"
 }
