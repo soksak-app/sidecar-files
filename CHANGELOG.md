@@ -4,6 +4,7 @@
 
 ## Unreleased
 
+- F355-4-files-sidecar-1: The lockfile holds no override and no link of a local development folder, which the frozen install of CI refuses, and a test fails on either.
 - F355-4-files-sidecar: `make release OUT=<folder>` writes the release with `npm pack`, which keeps the execute bit, and release.yml no longer downloads the sok of a core release, because core installs the `npm pack` file of a sidecar and has no `sok sidecar release`. The dependencies on core are pinned to the core release `v0.0.25`.
 - S49: Version 0.0.9 carries S48.
 - S48: `sidecar.json` declares no `hostReadOperations`, which core refuses from the release that holds F332-4-7.

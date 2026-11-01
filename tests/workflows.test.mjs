@@ -36,6 +36,11 @@ test("make release writes the npm pack file of . named with the platform into th
   assert.doesNotMatch(read("Makefile"), /\bSOK\b|sidecar release/, "the Makefile must not name a sok");
 });
 
+test("the lockfile names no override and no link source", { timeout: 1000 }, () => {
+  // An override or a link of a local checkout makes the frozen install of CI refuse the lockfile.
+  assert.doesNotMatch(read("pnpm-lock.yaml"), /^overrides:|\blink:/m, "pnpm-lock.yaml must not name an override or a link");
+});
+
 test("no workflow checks out another repository", { timeout: 1000 }, () => {
   for (const file of readdirSync(new URL("../.github/workflows/", import.meta.url)).filter((name) => name.endsWith(".yml"))) {
     assert.doesNotMatch(read(`.github/workflows/${file}`), /^\s*repository:/m, `${file} checks out another repository`);
