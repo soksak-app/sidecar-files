@@ -4,6 +4,7 @@
 
 ## 미배포
 
+- S50: version은 0.0.10다.
 - F355-3-4-files-sidecar: 검사는 core의 plugin API 대신 records kit과 events kit release에서 오고, sidecar test는 `validateSidecar` 없이 `sidecar.json`의 값을 검사한다. Red: `the checks come from the kit releases, and the plugin API of core is no dependency`가 실패했다. Green: 통과하고, `make test`가 통과한다.
 - F355-4-files-sidecar-2: make release test는 `make -n release`의 `npm pack` 줄을 읽는다. Linux의 GNU make는 그 뒤에 directory 줄을 출력하기 때문이다.
 - F355-4-files-sidecar-1: lockfile은 CI의 frozen install이 거부하는 local 개발 폴더의 override와 link를 담지 않고, test는 그 둘에 실패한다.

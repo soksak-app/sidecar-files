@@ -1,6 +1,6 @@
 {
   "name": "@soksak/sidecar-files",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "private": true,
   "description": "Files sidecar: lists, watches, and snapshots project file trees over line-delimited JSON.",
   "license": "MIT",
