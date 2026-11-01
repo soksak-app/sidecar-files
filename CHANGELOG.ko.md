@@ -4,6 +4,7 @@
 
 ## 미배포
 
+- F355-4-files-sidecar: `make release OUT=<folder>`는 실행 비트를 보존하는 `npm pack`으로 release를 쓰고, release.yml은 더 이상 core release의 sok를 내려받지 않는다. core가 sidecar의 `npm pack` 파일을 설치하고 `sok sidecar release`가 없기 때문이다. core 의존은 core release `v0.0.25`에 pin된다.
 - S49: 0.0.9판은 S48을 담는다.
 - S48: `sidecar.json`은 `hostReadOperations`를 선언하지 않는다. core는 F332-4-7을 담은 release부터 그 member를 거부한다.
 - S37: v0.0.8이 게시되었고 registry가 이를 올린다.

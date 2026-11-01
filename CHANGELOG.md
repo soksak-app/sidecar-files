@@ -4,6 +4,7 @@
 
 ## Unreleased
 
+- F355-4-files-sidecar: `make release OUT=<folder>` writes the release with `npm pack`, which keeps the execute bit, and release.yml no longer downloads the sok of a core release, because core installs the `npm pack` file of a sidecar and has no `sok sidecar release`. The dependencies on core are pinned to the core release `v0.0.25`.
 - S49: Version 0.0.9 carries S48.
 - S48: `sidecar.json` declares no `hostReadOperations`, which core refuses from the release that holds F332-4-7.
 - S37: v0.0.8 is published and the registry lists it.

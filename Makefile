@@ -1,8 +1,9 @@
-# files sidecar repository 의 test, build, release(docs/features.md). release 는 core 의 sok 를 쓴다.
+# files sidecar repository 의 test, build, release(docs/features.md). release 는 npm pack 으로 sidecar 폴더를 쓴다.
 .PHONY: install test build release push-check hooks
 
 GO_FLAGS ?=
-SOK ?= sok
+# The platform key of the release (core docs/spec/installation.md#sidecar-release).
+PLATFORM := $(shell node -p '(process.platform === "win32" ? "windows" : process.platform) + "-" + process.arch')
 
 ifeq ($(shell uname -s),Darwin)
 PROCESS_IDENTITY_PKGCONFIG = $(shell node -e 'const path=require("node:path");const {createRequire}=require("node:module");const r=createRequire(path.join(process.cwd(),"package.json"));process.stdout.write(path.join(path.dirname(r.resolve("@soksak/native-process-identity-darwin/package.json")),"lib/pkgconfig"))')
@@ -31,7 +32,9 @@ build:
 
 release: build
 	@test -n "$(OUT)" || { echo "make release OUT=<folder>" >&2; exit 2; }
-	$(SOK) sidecar release . $(OUT)
+	@mkdir -p $(OUT)
+	@# npm pack keeps the execute bit of the executable, which pnpm pack drops.
+	file="$$(npm pack --silent --pack-destination $(OUT))" && mv "$(OUT)/$$file" "$(OUT)/$${file%.tgz}-$(PLATFORM).tgz"
 
 # The check that a push needs: the commit messages of the pushed range, because a published commit message is kept; CI runs
 # the tests and checks on the pushed commits.
