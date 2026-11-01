@@ -30,7 +30,8 @@ test("the release writes the npm pack file of the sidecar and downloads no core 
 test("make release writes the npm pack file of . named with the platform into the folder that OUT names", { timeout: 30000 }, () => {
   const result = spawnSync("make", ["-n", "release", "OUT=/releases"], { cwd: new URL("..", import.meta.url), encoding: "utf8", timeout: 25000 });
   assert.equal(result.status, 0, result.stderr);
-  const pack = result.stdout.trim().split("\n").at(-1);
+  // GNU make prints the directory lines of a recursive make, so the pack command is found by its program.
+  const pack = result.stdout.trim().split("\n").find((line) => line.includes("npm pack --silent")) ?? result.stdout;
   assert.match(pack, /npm pack --silent --pack-destination \/releases/, `make release runs ${JSON.stringify(pack)}`);
   assert.match(pack, /-(?:darwin|linux|windows)-(?:arm64|x64)\.tgz"$/, `make release names the release with the platform: ${pack}`);
   assert.doesNotMatch(read("Makefile"), /\bSOK\b|sidecar release/, "the Makefile must not name a sok");

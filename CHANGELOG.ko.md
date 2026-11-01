@@ -4,6 +4,7 @@
 
 ## 미배포
 
+- F355-4-files-sidecar-2: make release test는 `make -n release`의 `npm pack` 줄을 읽는다. Linux의 GNU make는 그 뒤에 directory 줄을 출력하기 때문이다.
 - F355-4-files-sidecar-1: lockfile은 CI의 frozen install이 거부하는 local 개발 폴더의 override와 link를 담지 않고, test는 그 둘에 실패한다.
 - F355-4-files-sidecar: `make release OUT=<folder>`는 실행 비트를 보존하는 `npm pack`으로 release를 쓰고, release.yml은 더 이상 core release의 sok를 내려받지 않는다. core가 sidecar의 `npm pack` 파일을 설치하고 `sok sidecar release`가 없기 때문이다. core 의존은 core release `v0.0.25`에 pin된다.
 - S49: 0.0.9판은 S48을 담는다.
