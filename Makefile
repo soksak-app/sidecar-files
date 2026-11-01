@@ -15,7 +15,7 @@ test: process-identity-check
 build: process-identity-check
 endif
 
-# node test 는 sidecar.json 을 package.json 이 정한 core commit 의 @soksak/plugin-api 로 검사하고, soksak-events 는 같은 commit 의 census 와 event 카탈로그 검사다.
+# node test 는 sidecar.json 이 선언한 값을 검사하고, soksak-events 는 events kit release 의 census 와 event catalog 검사다.
 # The installation stage (core docs/spec/plugins.md#repositories): it installs the locked dependencies; the tests, checks and packs consume them without installing.
 install:
 	pnpm install --frozen-lockfile

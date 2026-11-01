@@ -4,6 +4,7 @@
 
 ## Unreleased
 
+- F355-3-4-files-sidecar: The checks come from the records kit and events kit releases instead of the plugin API of core, and the sidecar test checks the values of `sidecar.json` without `validateSidecar`. Red: `the checks come from the kit releases, and the plugin API of core is no dependency` failed. Green: it passes, and `make test` passes.
 - F355-4-files-sidecar-2: The make release test reads the `npm pack` line of `make -n release`, because GNU make prints directory lines after it on Linux.
 - F355-4-files-sidecar-1: The lockfile holds no override and no link of a local development folder, which the frozen install of CI refuses, and a test fails on either.
 - F355-4-files-sidecar: `make release OUT=<folder>` writes the release with `npm pack`, which keeps the execute bit, and release.yml no longer downloads the sok of a core release, because core installs the `npm pack` file of a sidecar and has no `sok sidecar release`. The dependencies on core are pinned to the core release `v0.0.25`.

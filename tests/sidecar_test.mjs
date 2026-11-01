@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { validateSidecar } from "@soksak/plugin-api";
 
 const read = (path) => JSON.parse(readFileSync(new URL(`../${path}`, import.meta.url), "utf8"));
 
-test("sidecar.json satisfies the sidecar format and the package publishes its executable", { timeout: 5000 }, () => {
+// The application validates the format of sidecar.json when it installs the release (core docs/spec/installation.md); this
+// test checks the values that this repository declares.
+test("sidecar.json declares the message form, the address and the events of the sidecar, and the package publishes its executable", { timeout: 5000 }, () => {
   const declared = read("sidecar.json");
-  const sidecar = validateSidecar(declared);
+  const sidecar = declared;
   assert.deepEqual(sidecar.message, { form: "json-object", operationField: "operation" });
   // Core refuses hostReadOperations, which only its removed plugin host read.
   assert.equal(Object.hasOwn(declared, "hostReadOperations"), false);

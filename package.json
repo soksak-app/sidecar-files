@@ -16,7 +16,8 @@
     "build/soksak-files"
   ],
   "devDependencies": {
-    "@soksak/plugin-api": "https://github.com/soksak-app/core/releases/download/v0.0.25/soksak-plugin-api-0.0.25.tgz"
+    "@soksak/kit-events": "https://github.com/soksak-app/kit-events/releases/download/v0.0.1/soksak-kit-events-0.0.1.tgz",
+    "@soksak/kit-records": "https://github.com/soksak-app/kit-records/releases/download/v0.0.1/soksak-kit-records-0.0.1.tgz"
   },
   "optionalDependencies": {
     "@soksak/native-process-identity-darwin": "https://github.com/soksak-app/core/releases/download/v0.0.25/soksak-native-process-identity-darwin-0.0.25.tgz"
