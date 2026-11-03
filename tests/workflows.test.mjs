@@ -51,7 +51,7 @@ test("no workflow checks out another repository", { timeout: 1000 }, () => {
 test("the checks come from the kit releases, and the plugin API of core is no dependency", { timeout: 1000 }, () => {
   const manifest = JSON.parse(read("package.json"));
   assert.equal(manifest.devDependencies["@soksak/plugin-api"], undefined);
-  assert.equal(manifest.devDependencies["@soksak/kit-records"], "https://github.com/soksak-app/kit-records/releases/download/v0.0.1/soksak-kit-records-0.0.1.tgz");
+  assert.equal(manifest.devDependencies["@soksak/kit-records"], "https://github.com/soksak-app/kit-records/releases/download/v0.0.6/soksak-kit-records-0.0.6.tgz");
   assert.equal(manifest.devDependencies["@soksak/kit-events"], "https://github.com/soksak-app/kit-events/releases/download/v0.0.1/soksak-kit-events-0.0.1.tgz");
   for (const file of readdirSync(new URL("../tests/", import.meta.url), { recursive: true }).filter((name) => /\.(?:mjs|js)$/.test(name))) {
     assert.doesNotMatch(read(`tests/${file}`), /(?:\bfrom\s+|\bimport\s*\(\s*)["']@soksak\/plugin-api/, `tests/${file} imports the plugin API of core`);

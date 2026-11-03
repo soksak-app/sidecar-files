@@ -4,6 +4,7 @@
 
 ## Unreleased
 
+- S51: The repository uses the records kit 0.0.6, whose release gate accepts a closed item with a `Closed:` reason.
 - S50: The version is 0.0.10.
 - F355-3-4-files-sidecar: The checks come from the records kit and events kit releases instead of the plugin API of core, and the sidecar test checks the values of `sidecar.json` without `validateSidecar`. Red: `the checks come from the kit releases, and the plugin API of core is no dependency` failed. Green: it passes, and `make test` passes.
 - F355-4-files-sidecar-2: The make release test reads the `npm pack` line of `make -n release`, because GNU make prints directory lines after it on Linux.
