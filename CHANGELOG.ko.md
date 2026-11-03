@@ -4,6 +4,7 @@
 
 ## 미배포
 
+- S52: lockfile이 로컬 link를 적지 않으므로 hosted job의 frozen 설치가 통과한다.
 - S51: 이 저장소는 records kit 0.0.6을 쓰며, 그 release gate는 `Closed:` 사유가 있는 닫힌 항목을 받아들인다.
 - S50: version은 0.0.10다.
 - F355-3-4-files-sidecar: 검사는 core의 plugin API 대신 records kit과 events kit release에서 오고, sidecar test는 `validateSidecar` 없이 `sidecar.json`의 값을 검사한다. Red: `the checks come from the kit releases, and the plugin API of core is no dependency`가 실패했다. Green: 통과하고, `make test`가 통과한다.
