@@ -2,6 +2,7 @@
 
 [English](features.md)
 
+- [ ] S53 — P1, records kit KR14, KR15와 연결: push check와 CI가 kit의 체크리스트 이력 검사를 실행한다. 입력: `package.json`이 pin한 kit 0.0.6에는 `soksak-records --range`가 없어, 이 repository의 어떤 검사도 체크리스트를 이전 text와 비교하지 않는다. 기대: KR14와 KR15를 담은 kit release 뒤에 `package.json`이 그 release를 pin하고, `make push-check`가 push 범위에 `soksak-records --range`를 실행하고, CI가 event의 범위에 이를 실행한다.
 - [o] S52 — P0, S51의 후속: lockfile은 로컬 link를 적지 않는다. 입력: S51은 로컬 명령이 추적되지 않는 workspace file의 override로 다시 쓴 lockfile을 저장했다. 동작: `pnpm install --frozen-lockfile`이 두 hosted job에서 `ERR_PNPM_LOCKFILE_CONFIG_MISMATCH`로 실패했다. 기대: lockfile에 override가 없다. Red: 그 lockfile에서 `the lockfile names no override and no link source`가 실패한다. Green: 추적되는 manifest로 만든 lockfile에서 test가 통과한다.
 - [o] S51 — P0: release gate는 `Closed:` 사유가 있는 닫힌 항목을 받아들인다. 입력: records kit 0.0.1의 gate는 `Not reproduced:`나 `Platform excluded:` 기록이 없는 닫힌 항목을 거부한다. 이 저장소에는 아직 닫힌 항목이 없어 Red 실행이 없다. 기대: 그 사유를 받아들이는 gate가 있는 kit 0.0.6. 결과: kit 0.0.6에서 `soksak-release-gate`와 workflow test가 통과한다.
 - [o] S50 — P1: 0.0.9 뒤의 records kit과 events kit release 검사(F355-3-4)를 담은 sidecar 0.0.10를 release한다. 기대: 모든 manifest의 version이 0.0.10이고, release run이 `v0.0.10`을 게시한다. 결과: release run이 `v0.0.10`을 게시했고, registry index가 그것을 올린다(registry G64).
