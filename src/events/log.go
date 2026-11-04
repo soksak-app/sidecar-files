@@ -20,8 +20,9 @@ import (
 	"unicode/utf8"
 )
 
-// Schema is the schema number of the lines that this writer writes. Schema 2 adds `mono_ns` to every line.
-const Schema = 2
+// Schema is the schema number of the lines that this writer writes, which is the number of the core event contract: a reader
+// refuses a file of another number.
+const Schema = 3
 
 // layer is the layer of every event of a sidecar.
 const layer = "sidecar"

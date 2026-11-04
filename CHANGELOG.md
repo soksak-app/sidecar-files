@@ -4,6 +4,7 @@
 
 ## Unreleased
 
+- S54: The event file opens with schema 3, the number of the core event contract, so `sok debug query` reads it.
 - S52: The lockfile names no local link, so the frozen installation of the hosted jobs passes.
 - S51: The repository uses the records kit 0.0.6, whose release gate accepts a closed item with a `Closed:` reason.
 - S50: The version is 0.0.10.

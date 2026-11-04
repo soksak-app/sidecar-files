@@ -4,6 +4,7 @@
 
 ## 미배포
 
+- S54: event 파일은 core event 계약의 번호인 schema 3으로 시작하므로 `sok debug query`가 읽는다.
 - S52: lockfile이 로컬 link를 적지 않으므로 hosted job의 frozen 설치가 통과한다.
 - S51: 이 저장소는 records kit 0.0.6을 쓰며, 그 release gate는 `Closed:` 사유가 있는 닫힌 항목을 받아들인다.
 - S50: version은 0.0.10다.
