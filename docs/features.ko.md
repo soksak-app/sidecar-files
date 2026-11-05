@@ -2,6 +2,7 @@
 
 [English](features.md)
 
+- [o] F468-sidecar-files — P2, core F468과 연결: 저장소가 kit의 `soksak-check docs`와 `soksak-check events`를 실행하고, `event-sources.json`이 event source를 선언한다. 결과: `make test`가 통과한다.
 - [o] F466-sidecar-files — P2, core F466과 연결: 저장소가 local build log와 임시 log의 인용을 보고하는 kit release를 pin하고, 기록에 그런 인용이 없다. 결과: `make test`가 통과한다.
 - [o] F467-sidecar-files — P1, core F467과 연결: 저장소가 workspace의 유일한 kit인 `@soksak/kit`을 pin한다. 입력: `@soksak/kit-checks`를 pin했다. 결과: `make test`가 통과한다.
 - [o] F463-sidecar-files — P0, core F463과 연결: 저장소가 checks kit을 쓴다. 입력: records kit과 events kit을 pin하고 그 command를 실행했다. 기대: `package.json`이 `@soksak/kit-checks`를 pin하고 hook, target, workflow가 `soksak-check`를 실행하며, test는 `package.json`의 kit release를 반복하지 않는다. Red: workflow test가 이전 command를 읽었다. Green: `make test`가 통과한다.
