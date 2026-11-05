@@ -2,6 +2,7 @@
 
 [English](features.md)
 
+- [~] F474-sidecar-files — P0, core F474와 연결: 0.0.10 뒤의 F463부터 F472까지의 검사와 명령 이름을 담은 files sidecar release를 게시하고 registry에 올리며 이를 쓰는 plugin이 요구하게 한다. 모든 manifest가 0.0.11을 밝힌다. 진행 중: release run이 v0.0.11을 게시한 뒤 registry가 이를 올린다.
 - [o] F472-sidecar-files — P2, core F472와 연결: 저장소의 명령 이름이 하는 일을 말하고, `make check`가 `sok-check commands`를 실행한다. 결과: `make test`가 통과한다.
 - [o] F468-sidecar-files — P2, core F468과 연결: 저장소가 kit의 `soksak-check docs`와 `soksak-check events`를 실행하고, `event-sources.json`이 event source를 선언한다. 결과: `make test`가 통과한다.
 - [o] F466-sidecar-files — P2, core F466과 연결: 저장소가 local build log와 임시 log의 인용을 보고하는 kit release를 pin하고, 기록에 그런 인용이 없다. 결과: `make test`가 통과한다.
