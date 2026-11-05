@@ -13,10 +13,10 @@
   "files": [
     "sidecar.json",
     "events.json",
-    "build/soksak-files"
+    "build/sok-files"
   ],
   "devDependencies": {
-    "@soksak/kit": "https://github.com/soksak-app/kit/releases/download/v0.0.12/soksak-kit-0.0.12.tgz"
+    "@soksak/kit": "https://github.com/soksak-app/kit/releases/download/v0.0.13/soksak-kit-0.0.13.tgz"
   },
   "optionalDependencies": {
     "@soksak/native-process-identity-darwin": "https://github.com/soksak-app/core/releases/download/v0.0.25/soksak-native-process-identity-darwin-0.0.25.tgz"

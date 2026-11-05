@@ -4,6 +4,7 @@
 
 ## 미배포
 
+- F472-sidecar-files: 명령 이름이 하는 일을 말하고, `sok-check commands`가 이를 강제한다.
 - F468-sidecar-files: 저장소가 `event-sources.json`과 함께 kit의 `soksak-check docs`와 `soksak-check events`를 실행한다.
 - F466-sidecar-files: 저장소가 local build log와 임시 log의 인용을 보고하는 kit release를 pin한다.
 - F467-sidecar-files: 저장소가 `@soksak/kit`을 pin한다.

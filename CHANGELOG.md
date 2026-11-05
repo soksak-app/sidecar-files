@@ -4,6 +4,7 @@
 
 ## Unreleased
 
+- F472-sidecar-files: The names of the commands state what they do, and `sok-check commands` holds them.
 - F468-sidecar-files: The repository runs `soksak-check docs` and `soksak-check events` of the kit with `event-sources.json`.
 - F466-sidecar-files: The repository pins the kit release that reports a citation of a local build log or a temporary log.
 - F467-sidecar-files: The repository pins `@soksak/kit`.

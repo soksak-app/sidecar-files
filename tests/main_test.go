@@ -43,7 +43,7 @@ func sidecarBinary(t *testing.T) string {
 			buildError = err
 			return
 		}
-		builtPath = filepath.Join(folder, "soksak-files")
+		builtPath = filepath.Join(folder, "sok-files")
 		output, err := exec.Command("go", "build", "-o", builtPath, "../src").CombinedOutput()
 		if err != nil {
 			buildError = errors.New(string(output))

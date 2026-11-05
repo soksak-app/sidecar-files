@@ -292,7 +292,7 @@ func checkCids(cids []string) error {
 
 // EmitHost queues an event. It returns false, and counts the loss, when the queue has no room or the event is invalid. It
 // never waits. The fields are serialized once, and only after the queue is known to have room for another event. The name
-// is the entrance name that the event source check of soksak-check events recognizes. An event that the policy does not store is counted for
+// is the entrance name that the event source check of sok-check events recognizes. An event that the policy does not store is counted for
 // log.gated and not queued; the fields may be a `func() map[string]any`, which runs only for an event that the policy stores.
 func (l *Log) EmitHost(level Level, event string, fields any) bool {
 	return l.emit(level, event, nil, fields)
