@@ -1,4 +1,4 @@
-// Checks that the event source check and the catalog guard of soksak-check events (core docs/spec/logging.md#event-sources) pass for this repository and
+// Checks that the event source check and the catalog guard of sok-check events (core docs/spec/logging.md#event-sources) pass for this repository and
 // fail for a source that has neither an event nor a reason.
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
@@ -8,7 +8,7 @@ import { join } from "node:path";
 import test, { after } from "node:test";
 
 const root = new URL("../", import.meta.url).pathname;
-const command = join(root, "node_modules/.bin/soksak-check");
+const command = join(root, "node_modules/.bin/sok-check");
 
 /** Runs the guard on the repository at `repository` with this repository's declarations and returns its status and standard error. */
 function guard(repository) {

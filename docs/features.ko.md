@@ -2,6 +2,7 @@
 
 [English](features.md)
 
+- [o] F472-sidecar-files — P2, core F472와 연결: 저장소의 명령 이름이 하는 일을 말하고, `make check`가 `sok-check commands`를 실행한다. 결과: `make test`가 통과한다.
 - [o] S54 — P0: sidecar의 event 파일은 core event 계약의 schema 번호로 시작한다. 입력: 기록기가 schema 2를 쓰고, schema 3인 core event 계약의 reader가 그 파일을 거부해서 `sok debug query`가 log 폴더 전체에서 `files-<boot>.jsonl: schema 2 is not 3`로 실패한다. 기대: `log.open`의 `schema`는 3이다(core `docs/spec/logging.ko.md#파일`). Red: golden 줄이 schema 3일 때 `TestTheFileOpensWithLogOpenAndTheNameFollowsTheContract`가 기록기에서 실패한다. Green: 같은 test가 통과한다.
 - [ ] S53 — P1, records kit KR14, KR15와 연결: push check와 CI가 kit의 체크리스트 이력 검사를 실행한다. 입력: `package.json`이 pin한 kit 0.0.6에는 `soksak-records --range`가 없어, 이 repository의 어떤 검사도 체크리스트를 이전 text와 비교하지 않는다. 기대: KR14와 KR15를 담은 kit release 뒤에 `package.json`이 그 release를 pin하고, `make push-check`가 push 범위에 `soksak-records --range`를 실행하고, CI가 event의 범위에 이를 실행한다.
 - [o] F468-sidecar-files — P2, core F468과 연결: 저장소가 kit의 `soksak-check docs`와 `soksak-check events`를 실행하고, `event-sources.json`이 event source를 선언한다. 결과: `make test`가 통과한다.
