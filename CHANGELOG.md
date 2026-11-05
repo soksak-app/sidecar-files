@@ -4,6 +4,7 @@
 
 ## Unreleased
 
+- F467-sidecar-files: The repository pins `@soksak/kit`.
 - F463-sidecar-files: The repository uses the checks kit and its one executable `soksak-check`.
 - S52: The lockfile names no local link, so the frozen installation of the hosted jobs passes.
 - S51: The repository uses the records kit 0.0.6, whose release gate accepts a closed item with a `Closed:` reason.
