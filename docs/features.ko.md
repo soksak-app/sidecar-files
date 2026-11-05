@@ -2,6 +2,7 @@
 
 [English](features.md)
 
+- [o] F466-sidecar-files — P2, core F466과 연결: 저장소가 local build log와 임시 log의 인용을 보고하는 kit release를 pin하고, 기록에 그런 인용이 없다. 결과: `make test`가 통과한다.
 - [o] F467-sidecar-files — P1, core F467과 연결: 저장소가 workspace의 유일한 kit인 `@soksak/kit`을 pin한다. 입력: `@soksak/kit-checks`를 pin했다. 결과: `make test`가 통과한다.
 - [o] F463-sidecar-files — P0, core F463과 연결: 저장소가 checks kit을 쓴다. 입력: records kit과 events kit을 pin하고 그 command를 실행했다. 기대: `package.json`이 `@soksak/kit-checks`를 pin하고 hook, target, workflow가 `soksak-check`를 실행하며, test는 `package.json`의 kit release를 반복하지 않는다. Red: workflow test가 이전 command를 읽었다. Green: `make test`가 통과한다.
 - [o] S52 — P0, S51의 후속: lockfile은 로컬 link를 적지 않는다. 입력: S51은 로컬 명령이 추적되지 않는 workspace file의 override로 다시 쓴 lockfile을 저장했다. 동작: `pnpm install --frozen-lockfile`이 두 hosted job에서 `ERR_PNPM_LOCKFILE_CONFIG_MISMATCH`로 실패했다. 기대: lockfile에 override가 없다. Red: 그 lockfile에서 `the lockfile names no override and no link source`가 실패한다. Green: 추적되는 manifest로 만든 lockfile에서 test가 통과한다.

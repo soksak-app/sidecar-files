@@ -2,6 +2,7 @@
 
 [한국어](features.ko.md)
 
+- [o] F466-sidecar-files — P2, linked to core F466: The repository pins the kit release whose record check reports a citation of a local build log or a temporary log, and its records hold no such citation. Result: `make test` passes.
 - [o] F467-sidecar-files — P1, linked to core F467: The repository pins `@soksak/kit`, the one kit of the workspace. Input: it pinned `@soksak/kit-checks`. Result: `make test` passes.
 - [o] F463-sidecar-files — P0, linked to core F463: The repository uses the checks kit. Input: it pinned the records kit and the events kit and ran their commands. Expected: `package.json` pins `@soksak/kit-checks`, and its hooks, targets and workflows run `soksak-check`; the tests do not repeat the kit release of `package.json`. Red: its workflow tests read the earlier commands. Green: `make test` passes.
 - [o] S52 — P0, follow-up of S51: The lockfile names no local link. Input: S51 stored a lockfile that a local command rewrote with the overrides of an untracked workspace file. Behavior: `pnpm install --frozen-lockfile` failed with `ERR_PNPM_LOCKFILE_CONFIG_MISMATCH` on both hosted jobs. Expected: the lockfile holds no override. Red: `the lockfile names no override and no link source` fails on that lockfile. Green: the test passes on the lockfile built from the tracked manifest.
