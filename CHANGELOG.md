@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+- F474-sidecar-files: The release run published v0.0.11, and the registry lists it.
+- F474-sidecar-files: The candidate is 0.0.11, which carries the checks and the command names of F463 to F472.
 - F472-sidecar-files: The names of the commands state what they do, and `sok-check commands` holds them.
 - S54: The event file opens with schema 3, the number of the core event contract, so `sok debug query` reads it.
 - F468-sidecar-files: The repository runs `soksak-check docs` and `soksak-check events` of the kit with `event-sources.json`.
