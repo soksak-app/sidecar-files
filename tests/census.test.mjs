@@ -1,4 +1,4 @@
-// Checks that the census and the catalog guard of soksak-events (core docs/spec/logging.md#census) pass for this repository and
+// Checks that the census and the catalog guard of soksak-check census (core docs/spec/logging.md#census) pass for this repository and
 // fail for a source that has neither an event nor a reason.
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
@@ -8,11 +8,11 @@ import { join } from "node:path";
 import test, { after } from "node:test";
 
 const root = new URL("../", import.meta.url).pathname;
-const command = join(root, "node_modules/.bin/soksak-events");
+const command = join(root, "node_modules/.bin/soksak-check");
 
 /** Runs the guard on the repository at `repository` with this repository's declarations and returns its status and standard error. */
 function guard(repository) {
-  const result = spawnSync(command, ["--census", "census.json", "--catalog", "events.json", repository], { encoding: "utf8" });
+  const result = spawnSync(command, ["census", "--config", "census.json", "--catalog", "events.json", repository], { encoding: "utf8" });
   return { status: result.status, stderr: result.stderr, stdout: result.stdout };
 }
 

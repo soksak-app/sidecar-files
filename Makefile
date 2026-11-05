@@ -15,7 +15,7 @@ test: process-identity-check
 build: process-identity-check
 endif
 
-# node test 는 sidecar.json 이 선언한 값을 검사하고, soksak-events 는 events kit release 의 census 와 event catalog 검사다.
+# node test 는 sidecar.json 이 선언한 값을 검사하고, soksak-check census 는 checks kit release 의 census 와 event catalog 검사다.
 # The installation stage (core docs/spec/plugins.md#repositories): it installs the locked dependencies; the tests, checks and packs consume them without installing.
 install:
 	pnpm install --frozen-lockfile
@@ -23,8 +23,8 @@ install:
 test:
 	$(PROCESS_IDENTITY_ENV) go test ./...
 	node --test tests/
-	node_modules/.bin/soksak-events --census census.json --catalog events.json
-	node_modules/.bin/soksak-records
+	node_modules/.bin/soksak-check census --config census.json --catalog events.json
+	node_modules/.bin/soksak-check records
 
 # sidecar.json 이 가리키는 build/soksak-files 를 쓴다.
 build:
@@ -40,7 +40,7 @@ release: build
 # the tests and checks on the pushed commits.
 # RANGE holds the commits of the pushed refs; the pre-push hook sets it, and it defaults to origin/main..HEAD.
 push-check:
-	pnpm exec soksak-commits "$(or $(RANGE),origin/main..HEAD)"
+	pnpm exec soksak-check commits "$(or $(RANGE),origin/main..HEAD)"
 
 # Sets this repository to use .githooks, which checks commit messages and records at commit time.
 hooks:
