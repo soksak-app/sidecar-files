@@ -4,6 +4,7 @@
 
 ## 미배포
 
+- F474-sidecar-files: release run이 v0.0.11을 게시했고 registry가 이를 올린다.
 - F474-sidecar-files: 후보는 0.0.11이며 F463부터 F472까지의 검사와 명령 이름을 담는다.
 - F472-sidecar-files: 명령 이름이 하는 일을 말하고, `sok-check commands`가 이를 강제한다.
 - F468-sidecar-files: 저장소가 `event-sources.json`과 함께 kit의 `soksak-check docs`와 `soksak-check events`를 실행한다.

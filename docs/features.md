@@ -2,7 +2,7 @@
 
 [한국어](features.ko.md)
 
-- [~] F474-sidecar-files — P0, linked to core F474: Publish a files sidecar release that carries the checks and the command names of F463 to F472 after 0.0.10, list it in the registry, and make the plugin that uses it require it. Every manifest names 0.0.11. Active: the release run publishes v0.0.11, then the registry lists it.
+- [o] F474-sidecar-files — P0, linked to core F474: Publish a files sidecar release that carries the checks and the command names of F463 to F472 after 0.0.10, list it in the registry, and make the plugin that uses it require it. Every manifest names 0.0.11. Result: the release run published v0.0.11, the registry lists it, and `sok plugin install` of the published core 0.0.36 selects it.
 - [o] F472-sidecar-files — P2, linked to core F472: The names of the commands of the repository state what they do, and `make check` runs `sok-check commands`. Result: `make test` passes.
 - [o] F468-sidecar-files — P2, linked to core F468: The repository runs `soksak-check docs` and `soksak-check events` of the kit, and `event-sources.json` declares its event sources. Result: `make test` passes.
 - [o] F466-sidecar-files — P2, linked to core F466: The repository pins the kit release whose record check reports a citation of a local build log or a temporary log, and its records hold no such citation. Result: `make test` passes.
