@@ -4,6 +4,7 @@
 
 ## 미배포
 
+- F463-sidecar-files: 저장소가 checks kit과 실행 파일 하나 `soksak-check`를 쓴다.
 - S52: lockfile이 로컬 link를 적지 않으므로 hosted job의 frozen 설치가 통과한다.
 - S51: 이 저장소는 records kit 0.0.6을 쓰며, 그 release gate는 `Closed:` 사유가 있는 닫힌 항목을 받아들인다.
 - S50: version은 0.0.10다.
