@@ -41,3 +41,37 @@ test("make install installs the locked dependencies, and no other target install
   const makefile = readFileSync(path.join(root, "Makefile"), "utf8");
   assert.deepEqual(makefile.split("\n").filter((line) => /^[^\t#][^:=]*:(?!=).*\bnode_modules\b/.test(line)), [], "a target depends on node_modules");
 });
+
+// Returns the value of the variable name that a recipe line sets in the environment of its command, or undefined.
+function environmentValue(line, name) {
+  return line.match(new RegExp(`(?:^|\\s)${name}="([^"]*)"`))?.[1];
+}
+
+// The executable declares MACOS_MINIMUM as its oldest macOS, so cgo compiles every C object for that release and the host
+// linker links for it; a C object compiled for the SDK default is newer than the executable declares (S57).
+test("each go command of build and test compiles and links for MACOS_MINIMUM under the link check (S57)", {
+  skip: process.platform !== "darwin",
+  timeout: 30000,
+}, () => {
+  const definitions = readFileSync(path.join(root, "Makefile"), "utf8").split("\n").filter((line) => /^MACOS_MINIMUM\s*=/.test(line));
+  assert.equal(definitions.length, 1, "the Makefile must define MACOS_MINIMUM once");
+  const minimum = definitions[0].replace(/^MACOS_MINIMUM\s*=\s*/, "").trim();
+  assert.match(minimum, /^\d+\.\d+$/, `MACOS_MINIMUM is ${JSON.stringify(minimum)}`);
+  const flag = `-mmacosx-version-min=${minimum}`;
+  for (const target of ["build", "test"]) {
+    const lines = recipe(target).split("\n");
+    const commands = lines.filter((line) => /\bgo (?:build|test)\b/.test(line));
+    assert.notEqual(commands.length, 0, `make ${target} runs no go command`);
+    // node --test runs tests that start go, which read the flags from the environment.
+    if (target === "test") commands.push(lines.find((line) => line.includes("node --test tests/")));
+    for (const command of commands) {
+      for (const name of ["CGO_CFLAGS", "CGO_LDFLAGS"]) {
+        const value = environmentValue(command, name);
+        assert.ok(value?.split(" ").includes(flag), `make ${target} sets no ${name} with ${flag}: ${command}`);
+      }
+    }
+    for (const command of commands.filter((line) => /\bgo (?:build|test)\b/.test(line))) {
+      assert.match(command, /\bnode scripts\/check-link\.mjs go (?:build|test)\b/, `make ${target} runs go outside the link check: ${command}`);
+    }
+  }
+});

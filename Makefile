@@ -6,6 +6,10 @@ GO_FLAGS ?=
 PLATFORM := $(shell node -p '(process.platform === "win32" ? "windows" : process.platform) + "-" + process.arch')
 
 ifeq ($(shell uname -s),Darwin)
+# The oldest macOS that the sidecar runs on, the value of core (core Makefile MACOS_MINIMUM). cgo compiles every C object for it
+# and the host linker links the executable for it; a test that starts go reads both values from its environment (S57).
+MACOS_MINIMUM = 14.4
+MACOS_ENV = CGO_CFLAGS="-O2 -g -mmacosx-version-min=$(MACOS_MINIMUM)" CGO_LDFLAGS="-O2 -g -mmacosx-version-min=$(MACOS_MINIMUM)"
 PROCESS_IDENTITY_PKGCONFIG = $(shell node -e 'const path=require("node:path");const {createRequire}=require("node:module");const r=createRequire(path.join(process.cwd(),"package.json"));process.stdout.write(path.join(path.dirname(r.resolve("@soksak/native-process-identity-darwin/package.json")),"lib/pkgconfig"))')
 PROCESS_IDENTITY_ENV = PKG_CONFIG_PATH="$(PROCESS_IDENTITY_PKGCONFIG)$(if $(PKG_CONFIG_PATH),:$(PKG_CONFIG_PATH))"
 .PHONY: check-process-identity
@@ -15,21 +19,25 @@ test: check-process-identity
 build: check-process-identity
 endif
 
+# Each go build and go test runs under scripts/check-link.mjs, which fails it when the linker reports an object built for a newer
+# macOS than the executable declares (S57).
+GO = $(PROCESS_IDENTITY_ENV) $(MACOS_ENV) node scripts/check-link.mjs go
+
 # node test 는 sidecar.json 이 선언한 값을 검사하고, sok-check events 는 kit release 의 event source check 와 event catalog 검사다.
 # The installation stage (core docs/spec/plugins.md#repositories): it installs the locked dependencies; the tests, checks and packs consume them without installing.
 install:
 	pnpm install --frozen-lockfile
 
 test:
-	$(PROCESS_IDENTITY_ENV) go test ./...
-	node --test tests/
+	$(GO) test ./...
+	$(MACOS_ENV) node --test tests/
 	node_modules/.bin/sok-check events --config event-sources.json --catalog events.json
 	node_modules/.bin/sok-check docs
 	node_modules/.bin/sok-check commands
 
 # sidecar.json 이 가리키는 build/sok-files 를 쓴다.
 build:
-	$(PROCESS_IDENTITY_ENV) go build $(GO_FLAGS) -o build/sok-files ./src
+	$(GO) build $(GO_FLAGS) -o build/sok-files ./src
 
 release: build
 	@test -n "$(OUT)" || { echo "make release OUT=<folder>" >&2; exit 2; }
