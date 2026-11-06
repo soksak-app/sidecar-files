@@ -25,3 +25,5 @@
 | `closed` | 세션의 감시를 멈춘 뒤 끝나면 `{surface, closed: true}`로 답하고, 멈추지 못하면 `{surface, closed: true, error}`로 답한다. 이 답은 core의 `docs/spec/sidecars.md#messages`가 정한 닫기 답이다 |
 | 잘못된 요청 줄 | 줄이 자기 surface를 밝히면 `{surface, body: {id, error}}`이다. 오류 문구는 파싱이나 형식 실패를 밝힌다. 읽을 수 있는 surface가 없는 줄은 답이 없고 기록되며, sidecar는 계속 실행하고 다음 요청에 답한다. |
 | 모든 실패 | `{id, error}`: `root`가 없거나, `path`가 절대 경로이거나 (심볼릭 링크를 따라간 뒤) `root`를 벗어나거나, 디렉터리를 읽을 수 없는 경우 |
+
+file operation 경계는 `WriteOpenedFile(file WritableFile, path string, content []byte)`이다. 호출자는 이미 경로를 해석하고 기존 version을 확인했거나 새 file을 배타적으로 생성했다. `WritableFile`은 `WriteAt`, `Truncate`, `Sync`, `Close`를 제공하며, `WriteAt`은 짧은 write에서 error를 반환하는 `io.WriterAt` 계약을 따른다. 함수는 offset 0에서 쓰고 write 성공 뒤에만 truncate하며, truncate 성공 뒤에만 sync하고 앞선 operation의 실패에도 정확히 한 번 close한다. 모든 실패에서 version을 반환하지 않고 operation error와 close error를 모두 보존한다. path 인수는 error를 식별하며 경로를 허용하는 역할은 하지 않는다. 소유 test는 이 경계에서 실제 임시 file을 감싸 부분 content를 관찰하고 각 완료 단계의 실패를 주입하며, 경로, version, in-place write 검증은 바꾸지 않는다.

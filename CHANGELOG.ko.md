@@ -4,6 +4,7 @@
 
 ## 미배포
 
+- S56: 기존 in-place writer에 `WritableFile` operation 경계를 둔다. 실제 file case 9개가 부분 write, truncate, sync, close 실패와 복합 error 및 정상 완료를 다룬다. 통제된 mutation 10개로 assertion이 error 유실, 잘못된 version, cleanup 누락과 bytes 변경을 거부함을 증명한다. 집중 read/write, mutation, 문서, event 검사가 macOS에서 통과한다.
 - S55: policy test의 주석이 golden case의 원본인 core 파일 `docs/spec/cases/log-contract/policy/cases.json`을 적는다.
 - S53: push check와 CI가 push 범위에 commit message 검사 뒤 kit 0.0.14의 체크리스트 이력 검사 `sok-check docs --range`를 실행한다.
 - F474-sidecar-files: release run이 v0.0.11을 게시했고 registry가 이를 올린다.

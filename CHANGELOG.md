@@ -4,6 +4,7 @@
 
 ## Unreleased
 
+- S56: The existing in-place writer has a `WritableFile` operation boundary. Nine real-file cases cover partial writes, truncate, sync and close failures, combined errors and successful completion. Ten controlled mutations prove that the assertions reject lost errors, false versions, missing cleanup and changed bytes. Focused read/write, mutation, documentation and event checks pass on macOS.
 - S55: The comment of the policy test names `docs/spec/cases/log-contract/policy/cases.json`, the core file that its golden cases copy.
 - S53: The push check and CI run the checklist history check `sok-check docs --range` of kit 0.0.14 on the pushed range, after the commit message check.
 - F474-sidecar-files: The release run published v0.0.11, and the registry lists it.
