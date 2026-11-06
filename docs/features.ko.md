@@ -2,6 +2,8 @@
 
 [English](features.md)
 
+- [ ] S53 — P1: 부분 write와 각 save 완료 단계의 실패를 시험한다. 입력: writer는 `WriteAt`, `Truncate`, `Sync`, `Close`를 처리하지만 현재 assertion은 모든 실패 경로의 불완전 write 동작을 입증하지 않는다. 이는 예방적 실패 경로 coverage이며 정상 save의 결함을 재현했다는 뜻이 아니다. 기대: file operation 경계에 실패를 주입하고, 해당하는 경우 불완전 write error를 보고하며, 실패한 save에는 성공 version을 반환하지 않고, 결과 file 상태를 확인한다. 검증: 추적하는 소유 case로 부분 write와 각 완료 단계 실패를 다루며 inode, mode, xattr, hardlink, symlink, BOM, conflict case를 유지한다. in-place write 계약을 보존하고, test를 통과시키기 위해 atomic rename으로 바꾸지 않는다.
+
 - [o] F474-sidecar-files — P0, core F474와 연결: 0.0.10 뒤의 F463부터 F472까지의 검사와 명령 이름을 담은 files sidecar release를 게시하고 registry에 올리며 이를 쓰는 plugin이 요구하게 한다. 모든 manifest가 0.0.11을 밝힌다. 결과: release run이 v0.0.11을 게시했고 registry가 이를 올리며, 게시된 core 0.0.36의 `sok plugin install`이 이를 선택한다.
 - [o] F472-sidecar-files — P2, core F472와 연결: 저장소의 명령 이름이 하는 일을 말하고, `make check`가 `sok-check commands`를 실행한다. 결과: `make test`가 통과한다.
 - [o] F468-sidecar-files — P2, core F468과 연결: 저장소가 kit의 `soksak-check docs`와 `soksak-check events`를 실행하고, `event-sources.json`이 event source를 선언한다. 결과: `make test`가 통과한다.
