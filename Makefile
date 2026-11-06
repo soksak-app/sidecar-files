@@ -37,11 +37,12 @@ release: build
 	@# npm pack keeps the execute bit of the executable, which pnpm pack drops.
 	file="$$(npm pack --silent --pack-destination $(OUT))" && mv "$(OUT)/$$file" "$(OUT)/$${file%.tgz}-$(PLATFORM).tgz"
 
-# The check that a push needs: the commit messages of the pushed range, because a published commit message is kept; CI runs
-# the tests and checks on the pushed commits.
+# The checks that a push needs: the commit messages and the checklist history of the pushed range, because a published
+# commit is kept; CI runs the tests and the other checks on the pushed commits.
 # RANGE holds the commits of the pushed refs; the pre-push hook sets it, and it defaults to origin/main..HEAD.
 check-push:
 	pnpm exec sok-check commits "$(or $(RANGE),origin/main..HEAD)"
+	pnpm exec sok-check docs --range "$(or $(RANGE),origin/main..HEAD)"
 
 # Sets this repository to use .githooks, which checks commit messages and records at commit time.
 install-hooks:

@@ -4,6 +4,7 @@
 
 ## 미배포
 
+- S53: push check와 CI가 push 범위에 commit message 검사 뒤 kit 0.0.14의 체크리스트 이력 검사 `sok-check docs --range`를 실행한다.
 - F474-sidecar-files: release run이 v0.0.11을 게시했고 registry가 이를 올린다.
 - F474-sidecar-files: 후보는 0.0.11이며 F463부터 F472까지의 검사와 명령 이름을 담는다.
 - F472-sidecar-files: 명령 이름이 하는 일을 말하고, `sok-check commands`가 이를 강제한다.
