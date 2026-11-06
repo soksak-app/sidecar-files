@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+- S53: The existing in-place writer has a `WritableFile` operation boundary. Nine real-file cases cover partial writes, truncate, sync and close failures, combined errors and successful completion. Ten controlled mutations prove that the assertions reject lost errors, false versions, missing cleanup and changed bytes. Focused read/write, mutation, documentation and event checks pass on macOS.
+
 - F474-sidecar-files: The release run published v0.0.11, and the registry lists it.
 - F474-sidecar-files: The candidate is 0.0.11, which carries the checks and the command names of F463 to F472.
 - F472-sidecar-files: The names of the commands state what they do, and `sok-check commands` holds them.

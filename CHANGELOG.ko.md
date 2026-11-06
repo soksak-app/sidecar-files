@@ -4,6 +4,8 @@
 
 ## 미배포
 
+- S53: 기존 in-place writer에 `WritableFile` operation 경계를 둔다. 실제 file case 9개가 부분 write, truncate, sync, close 실패와 복합 error 및 정상 완료를 다룬다. 통제된 mutation 10개로 assertion이 error 유실, 잘못된 version, cleanup 누락과 bytes 변경을 거부함을 증명한다. 집중 read/write, mutation, 문서, event 검사가 macOS에서 통과한다.
+
 - F474-sidecar-files: release run이 v0.0.11을 게시했고 registry가 이를 올린다.
 - F474-sidecar-files: 후보는 0.0.11이며 F463부터 F472까지의 검사와 명령 이름을 담는다.
 - F472-sidecar-files: 명령 이름이 하는 일을 말하고, `sok-check commands`가 이를 강제한다.

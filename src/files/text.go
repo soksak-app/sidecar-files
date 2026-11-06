@@ -197,6 +197,22 @@ func writeFile(root, path string, content []byte, expect *string) (string, error
 	if err != nil {
 		return "", err
 	}
+	return WriteOpenedFile(file, path, content)
+}
+
+// WritableFile is the file-operation boundary after path and version validation.
+// WriteAt follows io.WriterAt and returns an error when it writes fewer bytes than requested.
+type WritableFile interface {
+	io.WriterAt
+	Truncate(size int64) error
+	Sync() error
+	Close() error
+}
+
+// WriteOpenedFile replaces the content of an already validated file in place and closes it exactly once.
+// It returns the content version only after writing, truncation, synchronization and close all succeed.
+// The path names the file in errors; the caller owns path resolution, version checks and content limits.
+func WriteOpenedFile(file WritableFile, path string, content []byte) (string, error) {
 	written, err := file.WriteAt(content, 0)
 	if err == nil {
 		err = file.Truncate(int64(written))
