@@ -4,6 +4,7 @@
 
 ## Unreleased
 
+- S55: The comment of the policy test names `docs/spec/cases/log-contract/policy/cases.json`, the core file that its golden cases copy.
 - S53: The push check and CI run the checklist history check `sok-check docs --range` of kit 0.0.14 on the pushed range, after the commit message check.
 - F474-sidecar-files: The release run published v0.0.11, and the registry lists it.
 - F474-sidecar-files: The candidate is 0.0.11, which carries the checks and the command names of F463 to F472.

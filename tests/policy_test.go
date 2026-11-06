@@ -2,7 +2,7 @@ package files_test
 
 // Checks the policy of the event file against the policy contract of the soksak core specification (docs/spec/logging.md,
 // "Classes and policy" and "Policy file"). tests/fixtures/policy/cases.json is owned by core
-// (packages/log-contract/fixtures/policy/cases.json) and is copied unchanged; the reader of this repository must give the result
+// (docs/spec/cases/log-contract/policy/cases.json) and is copied unchanged; the reader of this repository must give the result
 // of each case.
 
 import (

@@ -2,6 +2,7 @@
 
 [English](features.md)
 
+- [o] S55 — P2: policy test가 golden case의 원본인 core 파일을 적는다. 입력: core는 event 계약의 fixture를 `packages/log-contract/fixtures`에서 `docs/spec/cases/log-contract`로 옮겼다(core F258-3). 동작: `tests/policy_test.go`의 주석은 core main에 없는 경로 `packages/log-contract/fixtures/policy/cases.json`을 적었고, `tests/fixtures/policy/cases.json`은 SHA-256이 같은 `docs/spec/cases/log-contract/policy/cases.json`의 사본이다. 기대: 주석이 `docs/spec/cases/log-contract/policy/cases.json`을 적는다. 결과: 그렇게 적는다. 주석을 읽는 test는 없고, `go test ./tests/ -run Policy`는 전처럼 통과한다.
 - [o] F474-sidecar-files — P0, core F474와 연결: 0.0.10 뒤의 F463부터 F472까지의 검사와 명령 이름을 담은 files sidecar release를 게시하고 registry에 올리며 이를 쓰는 plugin이 요구하게 한다. 모든 manifest가 0.0.11을 밝힌다. 결과: release run이 v0.0.11을 게시했고 registry가 이를 올리며, 게시된 core 0.0.36의 `sok plugin install`이 이를 선택한다.
 - [o] F472-sidecar-files — P2, core F472와 연결: 저장소의 명령 이름이 하는 일을 말하고, `make check`가 `sok-check commands`를 실행한다. 결과: `make test`가 통과한다.
 - [o] S54 — P0: sidecar의 event 파일은 core event 계약의 schema 번호로 시작한다. 입력: 기록기가 schema 2를 쓰고, schema 3인 core event 계약의 reader가 그 파일을 거부해서 `sok debug query`가 log 폴더 전체에서 `files-<boot>.jsonl: schema 2 is not 3`로 실패한다. 기대: `log.open`의 `schema`는 3이다(core `docs/spec/logging.ko.md#파일`). Red: golden 줄이 schema 3일 때 `TestTheFileOpensWithLogOpenAndTheNameFollowsTheContract`가 기록기에서 실패한다. Green: 같은 test가 통과한다.
