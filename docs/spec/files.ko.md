@@ -27,3 +27,5 @@
 | 모든 실패 | `{id, error}`: `root`가 없거나, `path`가 절대 경로이거나 (심볼릭 링크를 따라간 뒤) `root`를 벗어나거나, 디렉터리를 읽을 수 없는 경우 |
 
 file operation 경계는 `WriteOpenedFile(file WritableFile, path string, content []byte)`이다. 호출자는 이미 경로를 해석하고 기존 version을 확인했거나 새 file을 배타적으로 생성했다. `WritableFile`은 `WriteAt`, `Truncate`, `Sync`, `Close`를 제공하며, `WriteAt`은 짧은 write에서 error를 반환하는 `io.WriterAt` 계약을 따른다. 함수는 offset 0에서 쓰고 write 성공 뒤에만 truncate하며, truncate 성공 뒤에만 sync하고 앞선 operation의 실패에도 정확히 한 번 close한다. 모든 실패에서 version을 반환하지 않고 operation error와 close error를 모두 보존한다. path 인수는 error를 식별하며 경로를 허용하는 역할은 하지 않는다. 소유 test는 이 경계에서 실제 임시 file을 감싸 부분 content를 관찰하고 각 완료 단계의 실패를 주입하며, 경로, version, in-place write 검증은 바꾸지 않는다.
+
+sidecar는 표준 입력이 닫히거나 `SIGTERM`을 받으면 끝나고, 두 끝은 같은 경로를 탄다. 처리 중인 요청이 그 요청이 시작한 git process의 끝까지 포함해 먼저 끝난다. host가 process group에 signal을 보내면 git process도 같은 signal을 받는다. 다음 요청은 읽지 않는다. 그 뒤 sidecar는 `status`와 `end`(`input closed` 또는 `terminated`)를 담은 `sidecar.files.exit`를 저장하고, 모든 watch를 그 까닭으로 끝내 `sidecar.files.watch_end`에 남기고, event 파일을 flush한다. 순서는 이대로다. flush에는 시간 한도가 없다. writer가 queue의 모든 event를 쓰거나 writer가 끝나면 끝난다. 종료 상태는 두 끝 모두 0이고, sidecar를 끝낸 실패는 1이다.
