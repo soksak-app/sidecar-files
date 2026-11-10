@@ -35,7 +35,7 @@ func Go(name string, fn func()) {
 			fmt.Fprintf(os.Stderr, "files sidecar: panic in %s: %v\n%s", name, recovered, stack)
 			log := current.Load()
 			log.EmitHost(events.LevelError, "sidecar.files.panic", map[string]any{"routine": name, "panic": fmt.Sprint(recovered), "stack": stack})
-			if err := log.Flush(events.ExitDeadline); err != nil {
+			if err := log.Flush(); err != nil {
 				fmt.Fprintf(os.Stderr, "files sidecar: %v\n", err)
 			}
 			os.Exit(panicStatus)

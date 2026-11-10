@@ -27,7 +27,9 @@
 // A request may carry `cids`, the correlation identifiers of the inputs it continues; the reply lines that answer it carry the
 // same `cids` beside `surface` and `body`, and a failed request is the member `error` of the body.
 //
-// 세션은 감시하는 경로만 상태로 갖는다. Serve 는 입력이 닫히면 모든 감시를 끝내고 반환한다.
+// 세션은 감시하는 경로만 상태로 갖는다. Serve 는 입력이 닫히면 모든 감시를 끝내고 반환한다. The entrance of the process uses
+// Session, which stops reading on the end of the input or on a stop, and records the end of the process before it ends the
+// watches (docs/spec/files.md).
 package files
 
 import (
@@ -49,6 +51,7 @@ import (
 	_ "github.com/soksak-app/sidecar-files/src/platform/darwin"
 	_ "github.com/soksak-app/sidecar-files/src/platform/linux"
 	_ "github.com/soksak-app/sidecar-files/src/platform/windows"
+	"github.com/soksak-app/sidecar-files/src/routine"
 )
 
 // Request 는 호스트가 보낸 메시지 하나다.
@@ -108,29 +111,139 @@ type Event struct {
 	Error  string     `json:"error,omitempty"`
 }
 
-// Serve 는 in 이 닫힐 때까지 요청을 처리하고 답과 변경을 out 에 기록한다. 요청, 감시, git 호출은 log 에 event 로 남는다.
-// log 가 nil 이면 event 를 남기지 않는다.
+// Serve 는 in 이 닫힐 때까지 요청을 처리하고 답과 변경을 out 에 기록한 뒤 모든 감시를 끝낸다. 요청, 감시, git 호출은 log 에
+// event 로 남는다. log 가 nil 이면 event 를 남기지 않는다.
 func Serve(in io.Reader, out io.Writer, log *events.Log) error {
-	var mu sync.Mutex
-	encoder := json.NewEncoder(out)
+	session := NewSession(out, log)
+	end, err := session.Serve(in, nil)
+	session.Close(end)
+	return err
+}
+
+// End is why a session stopped reading requests (docs/spec/files.md): its input closed, the process received SIGTERM, or a
+// read or a write failed.
+type End string
+
+const (
+	InputClosed End = "input closed"
+	Terminated  End = "terminated"
+	Failed      End = "failed"
+)
+
+// Session is the state of the requests of one input: the writer of the replies, the watches and the tree routes.
+type Session struct {
+	mu       sync.Mutex
+	encoder  *json.Encoder
+	writeErr error
+	log      *events.Log
+	watches  *watches
+	trees    *treeRoutes
+}
+
+// NewSession returns a session that writes its replies and changes to out and its events to log; a nil log stores none.
+func NewSession(out io.Writer, log *events.Log) *Session {
+	session := &Session{encoder: json.NewEncoder(out), log: log, trees: newTreeRoutes()}
 	// 8 MiB 의 text 가 JSON 에서 커지는 것은 HTML 문자 escape 를 빼야 최대 6 배로 줄의 한도 안에 든다.
-	encoder.SetEscapeHTML(false)
-	var writeErr error
-	send := func(event Event) {
-		mu.Lock()
-		defer mu.Unlock()
-		if err := encoder.Encode(event); err != nil && writeErr == nil {
-			writeErr = fmt.Errorf("write event: %w", err)
+	session.encoder.SetEscapeHTML(false)
+	session.watches = newWatches(session.send, log)
+	return session
+}
+
+func (s *Session) send(event Event) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.encoder.Encode(event); err != nil && s.writeErr == nil {
+		s.writeErr = fmt.Errorf("write event: %w", err)
+	}
+}
+
+func (s *Session) written() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.writeErr
+}
+
+// Close ends every watch of the session with the reason end.
+func (s *Session) Close(end End) {
+	s.watches.closeAll(string(end))
+}
+
+// inputLine is one request line that the reader of the input took, or the end of the input with the error of the read.
+type inputLine struct {
+	text []byte
+	end  bool
+	err  error
+}
+
+// Serve handles the request lines of in one by one until in closes, stop closes, or a read or a write fails, and returns the
+// end and the failure. A nil stop never closes. The request in hand finishes before stop is seen, so a request ends with
+// the end of the git processes it started; no request after stop is read. The watches stay until Close.
+func (s *Session) Serve(in io.Reader, stop <-chan struct{}) (End, error) {
+	lines, next, quit := make(chan inputLine), make(chan struct{}, 1), make(chan struct{})
+	defer close(quit)
+	// The reader takes the next line only after the loop handled the line before, because the scanner reuses its buffer. A read
+	// does not end on stop; the process that stops ends it.
+	routine.Go("input", func() {
+		scanner := bufio.NewScanner(in)
+		// 요청 줄은 sidecar 출력 줄의 한도인 67108864 바이트까지다. 버퍼는 그 줄과 줄바꿈을 함께 담는다.
+		scanner.Buffer(make([]byte, 0, 64*1024), lineLimit+1)
+		for scanner.Scan() {
+			select {
+			case lines <- inputLine{text: scanner.Bytes()}:
+			case <-quit:
+				return
+			}
+			select {
+			case <-next:
+			case <-quit:
+				return
+			}
 		}
+		select {
+		case lines <- inputLine{end: true, err: scanner.Err()}:
+		case <-quit:
+		}
+	})
+	for {
+		// A stop that came before the next line ends the session even when that line is ready too.
+		select {
+		case <-stop:
+			return s.ended(Terminated)
+		default:
+		}
+		var line inputLine
+		select {
+		case line = <-lines:
+		case <-stop:
+			return s.ended(Terminated)
+		}
+		if line.end {
+			if line.err != nil {
+				return Failed, line.err
+			}
+			// A write of a watch change can fail while no request follows it. written takes the lock that the failed write holds, so
+			// the failure is returned here and not dropped when the input closes.
+			return s.ended(InputClosed)
+		}
+		s.serveLine(line.text)
+		if err := s.written(); err != nil {
+			return Failed, err
+		}
+		next <- struct{}{}
 	}
-	written := func() error {
-		mu.Lock()
-		defer mu.Unlock()
-		return writeErr
+}
+
+// ended returns end, or Failed with the failure of a write that no request reported.
+func (s *Session) ended(end End) (End, error) {
+	if err := s.written(); err != nil {
+		return Failed, err
 	}
-	watches := newWatches(send, log)
-	trees := newTreeRoutes()
-	defer watches.closeAll()
+	return end, nil
+}
+
+// serveLine answers one request line.
+func (s *Session) serveLine(line []byte) {
+	log, send, watches, trees := s.log, s.send, s.watches, s.trees
 	// refuse answers an invalid request line with its error on the surface the line names, and logs the line when it names none.
 	refuse := func(line []byte, cause error) {
 		var head struct {
@@ -148,52 +261,38 @@ func Serve(in io.Reader, out io.Writer, log *events.Log) error {
 		}
 		send(Event{Surface: head.Surface, Body: &EventBody{ID: head.Body.ID, Error: "invalid request: " + cause.Error()}})
 	}
-	scanner := bufio.NewScanner(in)
-	// 요청 줄은 sidecar 출력 줄의 한도인 67108864 바이트까지다. 버퍼는 그 줄과 줄바꿈을 함께 담는다.
-	scanner.Buffer(make([]byte, 0, 64*1024), lineLimit+1)
-	for scanner.Scan() {
-		var request Request
-		if err := json.Unmarshal(scanner.Bytes(), &request); err != nil {
-			// An invalid request is refused and the sidecar keeps running. The surface of the line names where the refusal goes, if the
-			// line has a readable one; a line without it has no reply and is only logged.
-			refuse(scanner.Bytes(), err)
-			continue
-		}
-		if request.Surface == "" {
-			refuse(scanner.Bytes(), fmt.Errorf("request without surface"))
-			continue
-		}
-		trace := Trace{Log: log, Surface: request.Surface, Cids: request.Cids}
-		started := time.Now()
-		if request.Closed {
-			trees.close(request.Surface)
-			// 감시를 끝낸 뒤 모든 closed 에 답한다.
-			answer := Event{Surface: request.Surface, Cids: request.Cids, Closed: true}
-			err := watches.set(request.Surface, "", nil, "closed", trace)
-			if err != nil {
-				answer.Error = err.Error()
-			}
-			trace.request(request, "closed", started, err)
-			send(answer)
-		} else {
-			body := EventBody{ID: request.Body.ID}
-			err := handle(watches, trees, request, &body, trace)
-			if err != nil {
-				body = EventBody{ID: request.Body.ID, Error: err.Error()}
-			}
-			trace.request(request, request.Body.Operation, started, err)
-			send(Event{Surface: request.Surface, Cids: request.Cids, Body: &body})
-		}
-		if err := written(); err != nil {
-			return err
-		}
+	var request Request
+	if err := json.Unmarshal(line, &request); err != nil {
+		// An invalid request is refused and the sidecar keeps running. The surface of the line names where the refusal goes, if the
+		// line has a readable one; a line without it has no reply and is only logged.
+		refuse(line, err)
+		return
 	}
-	if err := scanner.Err(); err != nil {
-		return err
+	if request.Surface == "" {
+		refuse(line, fmt.Errorf("request without surface"))
+		return
 	}
-	// A write of a watch change can fail while no request follows it. written takes the lock that the failed write holds, so
-	// the failure is returned here and not dropped when the input closes.
-	return written()
+	trace := Trace{Log: log, Surface: request.Surface, Cids: request.Cids}
+	started := time.Now()
+	if request.Closed {
+		trees.close(request.Surface)
+		// 감시를 끝낸 뒤 모든 closed 에 답한다.
+		answer := Event{Surface: request.Surface, Cids: request.Cids, Closed: true}
+		err := watches.set(request.Surface, "", nil, "closed", trace)
+		if err != nil {
+			answer.Error = err.Error()
+		}
+		trace.request(request, "closed", started, err)
+		send(answer)
+		return
+	}
+	body := EventBody{ID: request.Body.ID}
+	err := handle(watches, trees, request, &body, trace)
+	if err != nil {
+		body = EventBody{ID: request.Body.ID, Error: err.Error()}
+	}
+	trace.request(request, request.Body.Operation, started, err)
+	send(Event{Surface: request.Surface, Cids: request.Cids, Body: &body})
 }
 
 func handle(watches *watches, trees *treeRoutes, request Request, body *EventBody, trace Trace) error {
@@ -336,12 +435,13 @@ func (w *watches) watch(current platform.Platform, surface, root, path string) (
 	})
 }
 
-// closeAll ends every watch because the input closed. A watch that does not stop is reported to its surface and stored.
-func (w *watches) closeAll() {
+// closeAll ends every watch because the session ended for reason. A watch that does not stop is reported to its surface and
+// stored.
+func (w *watches) closeAll(reason string) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	for surface := range w.sessions {
-		if err := w.end(surface, "input closed"); err != nil {
+		if err := w.end(surface, reason); err != nil {
 			w.log.EmitHost(events.LevelError, "sidecar.files.watch_failed", map[string]any{"surface": surface, "path": "", "error": err.Error()})
 			w.send(Event{Surface: surface, Body: &EventBody{Error: err.Error()}})
 		}

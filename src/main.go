@@ -1,17 +1,21 @@
 // The files sidecar receives requests on the standard input and sends the replies on the standard output. The format is defined
-// in docs/spec/sidecars.md of the soksak core repository. The sidecar ends when the standard input closes.
+// in docs/spec/sidecars.md of the soksak core repository. The sidecar ends when the standard input closes or when it receives
+// SIGTERM, and both ends take the same cleanup (docs/spec/files.md).
 //
 // The argument --log-dir is the folder of the event file files-<boot>.jsonl, which the host names as the logs folder of the
 // configuration directory. The policy file log-policy.json is in the parent folder of that folder.
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"runtime"
+	"syscall"
 	"time"
 
 	catalog "github.com/soksak-app/sidecar-files"
@@ -28,8 +32,8 @@ func main() {
 	os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
 }
 
-// run starts the event log, serves the requests and returns the exit status: 0 when the input ended, 1 for a failure that
-// ended the sidecar and 2 for an argument that is not valid.
+// run starts the event log, serves the requests and returns the exit status: 0 when the input ended or SIGTERM came, 1 for a
+// failure that ended the sidecar and 2 for an argument that is not valid.
 func run(args []string, in io.Reader, out, stderr io.Writer) int {
 	// The first action of the process, before any other statement and before any setup: one text record
 	// (docs/spec/diagnostics.md#forms) on the standard error, which the host stores as a record of the layer sidecar, so the
@@ -37,6 +41,11 @@ func run(args []string, in io.Reader, out, stderr io.Writer) int {
 	// not to the event file, because the file of the contract starts with log.open and the writer that writes it exists only
 	// after the setup reads the arguments and the platform.
 	fmt.Fprintf(stderr, "%s info sidecar files: started\n", time.Now().UTC().Format(recordTimeLayout))
+	// The stop of the host closes the input and sends SIGTERM to the process group at almost the same time. From here on the
+	// signal stops the reading of requests and the sidecar ends through the cleanup of the end of the input (S58); a signal during
+	// the setup stops the session before its first request.
+	terminated, release := signal.NotifyContext(context.Background(), syscall.SIGTERM)
+	defer release()
 	displayName, err := catalog.ProcessDisplayName()
 	if err != nil {
 		fmt.Fprintf(stderr, "files sidecar: process identity: %v\n", err)
@@ -99,14 +108,19 @@ func run(args []string, in io.Reader, out, stderr io.Writer) int {
 	}
 	routine.Use(log)
 	log.EmitHost(events.LevelInfo, "sidecar.files.start", map[string]any{"pid": os.Getpid(), "goos": runtime.GOOS, "goarch": runtime.GOARCH})
+	session := files.NewSession(out, log)
+	// Serve returns after the request in hand, so the git processes of that request have ended.
+	end, err := session.Serve(in, terminated.Done())
 	status := 0
-	if err := files.Serve(in, out, log); err != nil {
+	if err != nil {
 		fmt.Fprintf(stderr, "files sidecar: %v\n", err)
 		log.EmitHost(events.LevelError, "sidecar.files.failure", map[string]any{"error": err.Error()})
 		status = 1
 	}
-	log.EmitHost(events.LevelInfo, "sidecar.files.exit", map[string]any{"status": status})
-	if err := log.Flush(events.ExitDeadline); err != nil {
+	// The cleanup of every end, in this order: the exit event, the end of the watches, the flush of the event file.
+	log.EmitHost(events.LevelInfo, "sidecar.files.exit", map[string]any{"status": status, "end": string(end)})
+	session.Close(end)
+	if err := log.Flush(); err != nil {
 		fmt.Fprintf(stderr, "files sidecar: %v\n", err)
 	}
 	log.Close()

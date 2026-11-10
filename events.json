@@ -187,7 +187,8 @@
             "type": "string",
             "enum": [
               "input closed",
-              "terminated"
+              "terminated",
+              "failed"
             ]
           }
         },
@@ -196,7 +197,7 @@
           "end"
         ]
       },
-      "description": "The sidecar ends with this exit status: 0 when its input closed or it received SIGTERM, 1 for a failure; end names which of the two ended it."
+      "description": "The sidecar ends with this exit status: 0 when its input closed or it received SIGTERM, 1 for a failure; end is input closed, terminated, or failed for a read or write failure."
     },
     "sidecar.files.failure": {
       "layer": "sidecar",
@@ -377,7 +378,7 @@
           "reason"
         ]
       },
-      "description": "A watch ended; reason is replaced, closed, input closed, terminated or start failed."
+      "description": "A watch ended; reason is replaced, closed, input closed, terminated, failed or start failed."
     },
     "sidecar.files.watch_failed": {
       "layer": "sidecar",

@@ -149,7 +149,7 @@ func startLogWithOptions(t *testing.T, folder string, change func(*events.Option
 
 func finish(t *testing.T, log *events.Log) []loggedEvent {
 	t.Helper()
-	if err := log.Flush(5 * time.Second); err != nil {
+	if err := log.Flush(); err != nil {
 		t.Fatal(err)
 	}
 	// The levels of the debug channel are in the debug file; the order of the two files is the order of their seq.
@@ -199,7 +199,7 @@ func TestTheLevelsOfTheDebugChannelGoToTheDebugFileWithOneSeqAcrossBoth(t *testi
 	log.EmitHost(events.LevelDebug, "sidecar.files.watch_change", map[string]any{"surface": "s", "path": "a"})
 	log.EmitHost(events.LevelWarn, "sidecar.files.watch_failed", map[string]any{"surface": "s", "path": "a", "error": "e"})
 	log.EmitHost(events.LevelTrace, "an.unknown.trace", map[string]any{})
-	if err := log.Flush(5 * time.Second); err != nil {
+	if err := log.Flush(); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(log.DebugPath()); err != nil {
@@ -274,7 +274,7 @@ func TestEveryLineCarriesTheClassThatTheCatalogDeclares(t *testing.T) {
 func TestAnEventLineKeepsTheKeyOrderOfTheGoldenLine(t *testing.T) {
 	log := startLog(t, nil)
 	log.EmitHostCids(events.LevelInfo, "sidecar.files.request", []string{"b1.1"}, map[string]any{"hex": "0d"})
-	if err := log.Flush(5 * time.Second); err != nil {
+	if err := log.Flush(); err != nil {
 		t.Fatal(err)
 	}
 	text, err := os.ReadFile(log.Path())
@@ -486,7 +486,7 @@ func TestTheQueueAcceptsEventsAgainAfterTheWriterWritesThem(t *testing.T) {
 			t.Fatalf("event %d was refused although the queue has room for it", i)
 		}
 	}
-	if err := log.Flush(5 * time.Second); err != nil {
+	if err := log.Flush(); err != nil {
 		t.Fatal(err)
 	}
 	for i := 4; i < 8; i++ {
@@ -507,7 +507,7 @@ func TestALossOfTheDebugChannelIsLabelledDebug(t *testing.T) {
 	if log.EmitHost(events.LevelDebug, "sidecar.files.watch_change", map[string]any{"i": 4}) {
 		t.Fatal("an event over the queue bound was accepted")
 	}
-	if err := log.Flush(5 * time.Second); err != nil {
+	if err := log.Flush(); err != nil {
 		t.Fatal(err)
 	}
 	var dropped []loggedEvent
@@ -542,7 +542,7 @@ func TestLossesAreRecordedOncePerChannelAndReason(t *testing.T) {
 	if log.EmitHost(events.LevelDebug, "sidecar.files.watch_change", map[string]any{"i": 4}) {
 		t.Fatal("a debug event over the queue bound was accepted")
 	}
-	if err := log.Flush(5 * time.Second); err != nil {
+	if err := log.Flush(); err != nil {
 		t.Fatal(err)
 	}
 	counts := map[string]float64{}
@@ -581,11 +581,11 @@ func TestAFailedDebugWriteIsRecordedInTheMainFile(t *testing.T) {
 	})
 	failures.Store(1)
 	log.EmitHost(events.LevelDebug, "sidecar.files.watch_change", map[string]any{"i": 1})
-	if err := log.Flush(5 * time.Second); err != nil {
+	if err := log.Flush(); err != nil {
 		t.Fatal(err)
 	}
 	log.EmitHost(events.LevelDebug, "sidecar.files.watch_change", map[string]any{"i": 2})
-	if err := log.Flush(5 * time.Second); err != nil {
+	if err := log.Flush(); err != nil {
 		t.Fatal(err)
 	}
 	var dropped []loggedEvent
@@ -618,7 +618,7 @@ func TestAFailedDebugWriteIsStoredInTheMainFileAtTheNextWrite(t *testing.T) {
 	})
 	failures.Store(1)
 	log.EmitHost(events.LevelDebug, "sidecar.files.watch_change", map[string]any{"i": 1})
-	if err := log.Flush(5 * time.Second); err != nil {
+	if err := log.Flush(); err != nil {
 		t.Fatal(err)
 	}
 	log.EmitHost(events.LevelInfo, "sidecar.files.start", map[string]any{"i": 2})
@@ -665,7 +665,7 @@ func TestAFailedMainWriteIsStoredAtTheNextWriteAfterClose(t *testing.T) {
 	})
 	failures.Store(1)
 	log.EmitHost(events.LevelInfo, "sidecar.files.start", map[string]any{"i": 1})
-	if err := log.Flush(5 * time.Second); err != nil {
+	if err := log.Flush(); err != nil {
 		t.Fatal(err)
 	}
 	log.Close()
@@ -708,7 +708,7 @@ func TestAFailedMainBatchKeepsTheChannelAndReasonOfEachLoss(t *testing.T) {
 	}
 	// The main batch holds the four events and the two log.dropped lines of the refusals, and its write fails.
 	failures.Store(1)
-	if err := log.Flush(5 * time.Second); err != nil {
+	if err := log.Flush(); err != nil {
 		t.Fatal(err)
 	}
 	log.EmitHost(events.LevelInfo, "sidecar.files.start", map[string]any{"i": 6})
@@ -830,7 +830,7 @@ func TestTheFileRotatesAtTheBoundAndKeepsTheGenerations(t *testing.T) {
 	log := startLog(t, func(options *events.Options) { options.RotateBytes = 1500; options.Generations = 2 })
 	for i := 0; i < 60; i++ {
 		log.EmitHost(events.LevelInfo, "sidecar.files.start", map[string]any{"i": i, "pad": strings.Repeat("p", 100)})
-		if err := log.Flush(5 * time.Second); err != nil {
+		if err := log.Flush(); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -883,7 +883,7 @@ func TestAFailedWriteIsCountedAndExplainedByLogDropped(t *testing.T) {
 	failures.Store(1)
 	// The batch with log.open, the first log.policy and the first event fails.
 	log.EmitHost(events.LevelInfo, "sidecar.files.start", map[string]any{"i": 1})
-	if err := log.Flush(5 * time.Second); err != nil {
+	if err := log.Flush(); err != nil {
 		t.Fatal(err)
 	}
 	log.EmitHost(events.LevelInfo, "sidecar.files.start", map[string]any{"i": 2})
@@ -917,7 +917,7 @@ func TestANilLogAcceptsNothingAndFailsNothing(t *testing.T) {
 	if log.EmitHost(events.LevelInfo, "sidecar.files.start", map[string]any{}) || log.EmitHostCids(events.LevelInfo, "sidecar.files.start", []string{"a"}, map[string]any{}) {
 		t.Fatal("a nil log accepted an event")
 	}
-	if err := log.Flush(time.Second); err != nil {
+	if err := log.Flush(); err != nil {
 		t.Fatal(err)
 	}
 	log.Close()
@@ -953,7 +953,7 @@ func TestADebugFileThatCannotBeCreatedIsCountedInLogDropped(t *testing.T) {
 		t.Fatal(err)
 	}
 	log.EmitHost(events.LevelDebug, "sidecar.files.watch_change", map[string]any{"i": 1})
-	if err := log.Flush(5 * time.Second); err != nil {
+	if err := log.Flush(); err != nil {
 		t.Fatal(err)
 	}
 	var dropped []loggedEvent
@@ -984,7 +984,7 @@ func TestALossReasonWithAControlCharacterIsStoredAsJSON(t *testing.T) {
 	})
 	failures.Store(1)
 	log.EmitHost(events.LevelInfo, "sidecar.files.start", map[string]any{"i": 1})
-	if err := log.Flush(5 * time.Second); err != nil {
+	if err := log.Flush(); err != nil {
 		t.Fatal(err)
 	}
 	log.EmitHost(events.LevelInfo, "sidecar.files.start", map[string]any{"i": 2})

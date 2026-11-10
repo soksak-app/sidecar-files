@@ -119,9 +119,6 @@ type message struct {
 	stop  bool
 }
 
-// ExitDeadline is the time a process waits for the event file to be flushed before it ends.
-const ExitDeadline = 2 * time.Second
-
 // reservedForRequests is the number of slots of the queue that only requests use.
 const reservedForRequests = 2
 
@@ -446,8 +443,9 @@ func (l *Log) classify(e *pendingEvent) {
 	}
 }
 
-// Flush writes everything that is queued and waits until it is on disk, at most deadline.
-func (l *Log) Flush(deadline time.Duration) error {
+// Flush writes everything that is queued and ends on the end of that write, or on the end of the writer, which writes every
+// event queued before its stop. It has no time limit: a wait ends only on an event (docs/spec/files.md in this repository).
+func (l *Log) Flush() error {
 	if l == nil {
 		// silent: a nil log has no file to flush.
 		return nil
@@ -459,14 +457,11 @@ func (l *Log) Flush(deadline time.Duration) error {
 	default:
 		return fmt.Errorf("the event writer did not take the flush request")
 	}
-	timer := time.NewTimer(deadline)
-	defer timer.Stop()
 	select {
 	case <-answer:
-		return nil
-	case <-timer.C:
-		return fmt.Errorf("the event writer did not flush within %s", deadline)
+	case <-l.done:
 	}
+	return nil
 }
 
 // Close writes everything that is queued and ends the writer. An event after Close is refused.
