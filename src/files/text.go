@@ -147,12 +147,25 @@ func writeBytesRequest(request Request, body *EventBody) error {
 	if len(content) > bytesLimit {
 		return tooLarge(int64(len(content)), bytesLimit, request.Body.Path)
 	}
-	written, err := writeFile(request.Root, request.Body.Path, content, expect)
+	written, err := writeFile(request.Root, request.Body.Path, content, expect, false)
 	if err != nil {
 		return err
 	}
 	body.Version = written
 	return nil
+}
+
+// requestExecutable reads the optional executable member of a write request. An absent member is false; a value that
+// is not a boolean, including null, is refused, because json.Unmarshal reads null into a bool without an error.
+func requestExecutable(request Request) (bool, error) {
+	if len(request.Body.Executable) == 0 {
+		return false, nil
+	}
+	var executable bool
+	if err := json.Unmarshal(request.Body.Executable, &executable); err != nil || string(request.Body.Executable) == "null" {
+		return false, errors.New("write executable must be a boolean")
+	}
+	return executable, nil
 }
 
 // writeRequest 는 write 요청의 필드를 확인하고 Write 를 실행한다. expect 가 빠진 요청은 null 로 보지 않고 거절한다.
@@ -167,7 +180,11 @@ func writeRequest(request Request, body *EventBody) error {
 	if err != nil {
 		return err
 	}
-	written, err := Write(request.Root, request.Body.Path, *request.Body.Text, expect, *request.Body.BOM)
+	executable, err := requestExecutable(request)
+	if err != nil {
+		return err
+	}
+	written, err := Write(request.Root, request.Body.Path, *request.Body.Text, expect, *request.Body.BOM, executable)
 	if err != nil {
 		return err
 	}
@@ -179,7 +196,8 @@ func writeRequest(request Request, body *EventBody) error {
 // expect 가 판이면 있는 정규 파일을 자르지 않고 열어 같은 기술자로 읽은 판이 expect 와 같을 때만 처음부터 덮어쓰고
 // 쓴 길이로 자른다. 그래서 inode, 권한, 확장 속성, ACL, 하드 링크, 심볼릭 링크가 그대로 남는다.
 // expect 가 nil 이면 새 파일을 0666(umask 적용)으로 만들고, 경로가 있으면 실패한다.
-func Write(root, path, text string, expect *string, bom bool) (string, error) {
+// executable 이 true 면 새 파일과 있는 파일 모두의 권한을 umask 와 관계없이 0755 로 맞춘다.
+func Write(root, path, text string, expect *string, bom, executable bool) (string, error) {
 	if len(text) > textLimit {
 		return "", tooLarge(int64(len(text)), textLimit, path)
 	}
@@ -187,15 +205,26 @@ func Write(root, path, text string, expect *string, bom bool) (string, error) {
 	if bom {
 		content = append(append([]byte{}, byteOrderMark...), content...)
 	}
-	return writeFile(root, path, content, expect)
+	return writeFile(root, path, content, expect, executable)
 }
 
 // writeFile writes content to path inside root with the in-place, expect and creation rules of Write and returns
-// the version of content.
-func writeFile(root, path string, content []byte, expect *string) (string, error) {
+// the version of content. The mode is set to 0755 after the expect check and before any byte is written, so a
+// refused request keeps the mode. Chmod ignores the umask, which is the reason 0755 is exact. A new file whose mode
+// cannot be set is removed, because the next write without expect would refuse it as existing.
+func writeFile(root, path string, content []byte, expect *string, executable bool) (string, error) {
 	file, err := openForWrite(root, path, expect)
 	if err != nil {
 		return "", err
+	}
+	if executable {
+		if err := file.Chmod(0o755); err != nil {
+			err = errors.Join(fmt.Errorf("chmod %s: %w", path, err), file.Close())
+			if expect == nil {
+				err = errors.Join(err, os.Remove(file.Name()))
+			}
+			return "", err
+		}
 	}
 	return WriteOpenedFile(file, path, content)
 }

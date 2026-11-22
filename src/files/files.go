@@ -69,6 +69,8 @@ type Request struct {
 		Text   *string         `json:"text"`
 		Expect json.RawMessage `json:"expect"`
 		BOM    *bool           `json:"bom"`
+		// Executable 은 write 의 선택 member 다. 빠지면 false 이고, boolean 이 아닌 값은 거절하려고 원문 그대로 받는다.
+		Executable json.RawMessage `json:"executable"`
 		// Data holds the base64 bytes of writeBytes.
 		Data *string `json:"data"`
 	} `json:"body"`
