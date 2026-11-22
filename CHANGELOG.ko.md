@@ -4,6 +4,7 @@
 
 ## 미배포
 
+- S63: 후보 version은 0.0.13이며, `write`의 member `executable`(S62)을 담는다.
 - S62: `write`가 선택 boolean `executable`을 받는다. `true`면 새 파일과 기존 파일 모두에 쓴 파일의 mode를 0755로 정확히 설정하며, 이는 `expect` 검사 뒤, byte를 쓰기 전에 일어난다. member가 없으면 동작은 그대로이고, boolean이 아닌 `executable`은 `write executable must be a boolean`으로 실패한다. `tests/executable_test.go`의 case 5개가 제한적인 umask 아래의 새 파일, 기존 파일, member가 없을 때 mode 유지, boolean이 아닌 값의 거절, 바뀐 파일을 다룬다.
 - S61: 후보 version은 0.0.12이며, `createFolder`(S58), `write`와 `writeBytes`의 member(S59), 명세의 `sidecar.json` member(S60)를 담는다.
 - S60: 명세가 `sidecar.json`은 operation 목록을 선언하지 않으며 `message.operationField`이 operation을 고른다고 적도록, 오래된 네 host operation 문장을 바꾼다. 문서 변경이며 동작은 바뀌지 않는다.

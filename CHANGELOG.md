@@ -4,6 +4,7 @@
 
 ## Unreleased
 
+- S63: The candidate is 0.0.13, which carries the executable member of `write` (S62).
 - S62: `write` takes an optional boolean `executable`. `true` sets the mode of the written file to 0755 exactly, for a new file and for an existing file, after the `expect` check and before any byte is written. Without the member the behaviour is unchanged, and a non-boolean `executable` fails with `write executable must be a boolean`. Five cases in `tests/executable_test.go` cover a new file under a restrictive umask, an existing file, the unchanged mode without the member, the refusal of a non-boolean value and a changed file.
 - S61: The candidate is 0.0.12, which carries `createFolder` (S58), the members of `write` and `writeBytes` (S59) and the `sidecar.json` members of the specification (S60).
 - S60: The spec states that `sidecar.json` declares no operation list and that its `message.operationField` selects the operation, replacing the stale sentence about four host operations. The documentation change has no behavior change.
