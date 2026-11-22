@@ -12,6 +12,7 @@
 //	      {"surface": id, "root": 경로, "body": {"operation": "write", "id": 요청, "path": 상대 경로, "text": 내용, "expect": 판|null, "bom": 참거짓}}
 //	      {"surface": id, "root": 경로, "body": {"operation": "readBytes", "id": 요청, "path": 상대 경로}}
 //	      {"surface": id, "root": 경로, "body": {"operation": "writeBytes", "id": 요청, "path": 상대 경로, "data": base64, "expect": 판|null}}
+//	      {"surface": id, "root": 경로, "body": {"operation": "createFolder", "id": 요청, "path": 상대 경로}}
 //	      {"surface": id, "closed": true}
 //	출력  {"surface": id, "body": {"id": 요청, "entries": [{"name": 이름, "directory": 참거짓}]}}
 //	      {"surface": id, "body": {"id": 요청, "entries": [{"path": 상대 경로, "status": 상태}]}}
@@ -223,6 +224,8 @@ func handle(watches *watches, trees *treeRoutes, request Request, body *EventBod
 		return ReadBytes(request.Root, request.Body.Path, body)
 	case "writeBytes":
 		return writeBytesRequest(request, body)
+	case "createFolder":
+		return CreateFolder(request.Root, request.Body.Path)
 	case "watch":
 		return watches.set(request.Surface, request.Root, request.Body.Paths, "replaced", trace)
 	case "snapshot":

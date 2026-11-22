@@ -4,6 +4,7 @@
 
 ## Unreleased
 
+- S58: `{operation: "createFolder"}` creates `root/path` and its missing parent folders with mode 0777 under the umask. An existing folder answers success, an existing non-folder fails with `not a folder: <path>`, and the path rules of `list` apply. Five cases in `tests/folder_test.go` cover the mode, idempotence, refusal, paths that leave the root and symbolic links.
 - S57: cgo compiles every C object and the host linker links the sidecar for macOS 14.4, the `MACOS_MINIMUM` of the Makefile, and `make build` and `make test` fail when the linker reports an object built for a newer macOS.
 - S56: The existing in-place writer has a `WritableFile` operation boundary. Nine real-file cases cover partial writes, truncate, sync and close failures, combined errors and successful completion. Ten controlled mutations prove that the assertions reject lost errors, false versions, missing cleanup and changed bytes. Focused read/write, mutation, documentation and event checks pass on macOS.
 - S55: The comment of the policy test names `docs/spec/cases/log-contract/policy/cases.json`, the core file that its golden cases copy.
