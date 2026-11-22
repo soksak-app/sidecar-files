@@ -4,6 +4,7 @@
 
 ## Unreleased
 
+- S61: The candidate is 0.0.12, which carries `createFolder` (S58), the members of `write` and `writeBytes` (S59) and the `sidecar.json` members of the specification (S60).
 - S60: The spec states that `sidecar.json` declares no operation list and that its `message.operationField` selects the operation, replacing the stale sentence about four host operations. The documentation change has no behavior change.
 - S59: The spec of `write` and `writeBytes` states the members that they require, the refusal text of each absent member and the SHA-256 rule of `expect`. The code and tests already refuse these requests, so no behavior changes.
 - S58: `{operation: "createFolder"}` creates `root/path` and its missing parent folders with mode 0777 under the umask. An existing folder answers success, an existing non-folder fails with `not a folder: <path>`, and the path rules of `list` apply. Five cases in `tests/folder_test.go` cover the mode, idempotence, refusal, paths that leave the root and symbolic links.

@@ -4,6 +4,7 @@
 
 ## 미배포
 
+- S61: 후보 version은 0.0.12이며, `createFolder`(S58), `write`와 `writeBytes`의 member(S59), 명세의 `sidecar.json` member(S60)를 담는다.
 - S60: 명세가 `sidecar.json`은 operation 목록을 선언하지 않으며 `message.operationField`이 operation을 고른다고 적도록, 오래된 네 host operation 문장을 바꾼다. 문서 변경이며 동작은 바뀌지 않는다.
 - S59: `write`와 `writeBytes`의 명세가 필수 member, 빠진 member의 거절 text, `expect`의 SHA-256 규칙을 적는다. 코드와 테스트가 이미 이 요청을 거절하므로 동작은 바뀌지 않는다.
 - S58: `{operation: "createFolder"}`가 `root/path`와 없는 상위 폴더를 umask를 적용한 0777 모드로 만든다. 이미 있는 폴더는 성공으로 답하고, 폴더가 아닌 기존 항목은 `not a folder: <path>`로 실패하며, `list`의 경로 규칙을 적용한다. `tests/folder_test.go`의 case 5개가 모드, idempotence, 거절, root를 벗어나는 경로와 심볼릭 링크를 다룬다.
