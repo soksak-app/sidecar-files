@@ -4,6 +4,7 @@
 
 ## 미배포
 
+- S59: `write`와 `writeBytes`의 명세가 필수 member, 빠진 member의 거절 text, `expect`의 SHA-256 규칙을 적는다. 코드와 테스트가 이미 이 요청을 거절하므로 동작은 바뀌지 않는다.
 - S58: `{operation: "createFolder"}`가 `root/path`와 없는 상위 폴더를 umask를 적용한 0777 모드로 만든다. 이미 있는 폴더는 성공으로 답하고, 폴더가 아닌 기존 항목은 `not a folder: <path>`로 실패하며, `list`의 경로 규칙을 적용한다. `tests/folder_test.go`의 case 5개가 모드, idempotence, 거절, root를 벗어나는 경로와 심볼릭 링크를 다룬다.
 - S57: cgo가 모든 C object를, host linker가 sidecar를 Makefile의 `MACOS_MINIMUM`인 macOS 14.4로 만들고, linker가 더 새 macOS용 object를 보고하면 `make build`와 `make test`가 실패한다.
 - S56: 기존 in-place writer에 `WritableFile` operation 경계를 둔다. 실제 file case 9개가 부분 write, truncate, sync, close 실패와 복합 error 및 정상 완료를 다룬다. 통제된 mutation 10개로 assertion이 error 유실, 잘못된 version, cleanup 누락과 bytes 변경을 거부함을 증명한다. 집중 read/write, mutation, 문서, event 검사가 macOS에서 통과한다.
